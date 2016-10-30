@@ -1,0 +1,30 @@
+#version 410 core
+
+out VS_OUT
+{
+    vec3    tc;
+} vs_out;
+
+uniform mat4 view_matrix;
+uniform mat4 proj_matrix;
+void main(void)
+{
+    vec3[4] vertices = vec3[4](vec3(-1.0, -1.0, 1.0),
+                               vec3( 1.0, -1.0, 1.0),
+                               vec3(-1.0,  1.0, 1.0),
+                               vec3( 1.0,  1.0, 1.0));
+
+							   
+	mat4 inverseProjection = inverse(proj_matrix);
+    mat3 inverseModelview = transpose(mat3(view_matrix));
+    vec3 unprojected = (inverseProjection * vec4(vertices[gl_VertexID],1)).xyz;
+    vs_out.tc = (inverseModelview * unprojected).xyz;
+
+   // gl_Position = aPosition;
+							   
+							   
+							   
+   // vs_out.tc = mat3(view_matrix) * vertices[gl_VertexID];
+
+    gl_Position = vec4(vertices[gl_VertexID], 1.0);
+}
