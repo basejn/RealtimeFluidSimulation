@@ -271,6 +271,9 @@ public:
         base::data[0] = x;
         base::data[1] = y;
     }
+	inline T x(){ return base::data[0]; }
+	inline T y(){ return base::data[1]; }
+
 };
 
 template <typename T>
@@ -308,6 +311,9 @@ public:
         base::data[1] = v[0];
         base::data[2] = v[1];
     }
+	inline T x(){ return base::data[0]; }
+	inline T y(){ return base::data[1]; }
+	inline T z(){ return base::data[2]; }
 
 	
 };
@@ -386,6 +392,10 @@ public:
         base::data[2] = v[1];
         base::data[3] = v[2];
     }
+	inline T x(){ return base::data[0]; }
+	inline T y(){ return base::data[1]; }
+	inline T z(){ return base::data[2]; }
+	inline T w(){ return base::data[3]; }
 };
 
 

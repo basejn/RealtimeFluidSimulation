@@ -19,6 +19,10 @@
 #include<string>
 #include<fstream>
 #include<string>
+#include <mutex>
+#include<vector>
+#include<memory>
+
  #define DBOUT( s )            \
 {                              \
    std::wostringstream os_;    \
@@ -60,7 +64,7 @@ enum
 };
 #define INT_STATE_FROM_FILE 1
 #define OPTIM_STRUCT  5 //0=no 1=array 2=lists 3=listsParral 4=listsParralThreadPool 5=listsParralThreadPoolArrays
-#define CHUNK_COUNT 4
+
 const int    GRID_SIDE =15;
 const float  GRID_VOLUME_SIDE = 20.0f;  //+-10
 const float  GRID_OFFSET = 10.0f ; //+-10
@@ -77,6 +81,7 @@ const int POSITIONS_SIZE = POINTS_TOTAL * sizeof(vmath::vec3);
 class  GridOptimiser{
 public:virtual void fillList(vmath::vec3 * pointsBuffer, int * gridBuffer, vmath::vec3 offset_vec) = 0;
 	   virtual void join_Workers() = 0;
+	   virtual bool is_ready() = 0;
 	   float optTime;
 };
 class GridListsOfListsOptimiser:public GridOptimiser{
@@ -256,7 +261,8 @@ protected:
 	void GridListKernelParall(int globalIndex,int firstPoint,int nPoints){			
 		for(int i =firstPoint;i<firstPoint+nPoints;i++){				
 			int listInd = CellIndex(pointsBuffer+i)*2;	
-		//	std::stringstream sst;	sst<<"\n "<<listInd<<" thr:"<<globalIndex;DBOUT(sst.str().data());			
+		//	std::stringstream sst;	sst<<"\n "<<listInd<<" thr:"<<globalIndex;DBOUT(sst.str().data());	
+		
 			int newMemory = ++(*lastUsedInd)*2;//alocating memory
 			while(list_Locs[listInd/2].test_and_set(std::memory_order_acquire));// aquire lock
 				if(gridBuffer[listInd]==0){// pyrwiqt elemnt v spisyka
@@ -745,13 +751,13 @@ public:
 		delete [] initial_density_pressure;
 
 #if(OPTIM_STRUCT ==4||OPTIM_STRUCT ==5)
-		glGenBuffers(CHUNK_COUNT,m_grdBufferChunks_vbo);
-		glGenTextures(CHUNK_COUNT, m_GRIDLIST_tbo);
+		glGenBuffers(2,m_grdBufferChunks_vbo);
+		glGenTextures(2, m_GRIDLIST_tbo);
 		pointsBuffer[0] = (vmath::vec3 *)glMapNamedBufferRange( m_vbo[POSITION_A], 0, POSITIONS_SIZE, GL_MAP_READ_BIT|GL_MAP_PERSISTENT_BIT);
 		pointsBuffer[1] = (vmath::vec3 *)glMapNamedBufferRange( m_vbo[POSITION_A+1], 0, POSITIONS_SIZE, GL_MAP_READ_BIT|GL_MAP_PERSISTENT_BIT);
-		for(int i=0;i<CHUNK_COUNT;i++){
-			  fence[i] = 0;
-			  glBindBuffer(GL_ARRAY_BUFFER, m_grdBufferChunks_vbo[i]);
+		for(int i=0;i<2;i++){
+			fence[i] = 0;
+			glBindBuffer(GL_ARRAY_BUFFER, m_grdBufferChunks_vbo[i]);
             //glBufferData(GL_ARRAY_BUFFER, GRIDLIST_SIZE, NULL, GL_DYNAMIC_COPY);
 			glBufferStorage(GL_ARRAY_BUFFER, GRIDLIST_SIZE, NULL, GL_DYNAMIC_STORAGE_BIT|GL_MAP_WRITE_BIT|GL_MAP_PERSISTENT_BIT);
 
@@ -763,10 +769,10 @@ public:
 			gridBuffer[i]=gridBuffertmp;
 	
 			(gridOptimiser)->join_Workers();
-	//glFlushMappedNamedBufferRange(m_vbo[GRIDLIST_A + (i & 1)],0,GRIDLIST_SIZE);
+			//glFlushMappedNamedBufferRange(m_vbo[GRIDLIST_A + (i & 1)],0,GRIDLIST_SIZE);
 		
-        glBindTexture(GL_TEXTURE_BUFFER, m_GRIDLIST_tbo[i]);
-        glTexBuffer(GL_TEXTURE_BUFFER, GL_R32I, m_grdBufferChunks_vbo[i]);
+			glBindTexture(GL_TEXTURE_BUFFER, m_GRIDLIST_tbo[i]);
+			glTexBuffer(GL_TEXTURE_BUFFER, GL_R32I, m_grdBufferChunks_vbo[i]);
 		}
 #endif
 
@@ -820,16 +826,102 @@ public:
         vmath::vec4 * initial_velocities = new vmath::vec4 [POINTS_TOTAL];				
 		vmath::vec2 * initial_density_pressure = new vmath::vec2 [POINTS_TOTAL];
 		
-	glGetNamedBufferSubData(m_vbo[POSITION_A],0,sizeof(vmath::vec3)*POINTS_TOTAL,initial_positions);
-	glGetNamedBufferSubData(m_vbo[VELOCITY_A],0,sizeof(vmath::vec4)*POINTS_TOTAL,initial_velocities);
-	glGetNamedBufferSubData(m_vbo[DENSITY_A],0,sizeof(vmath::vec2)*POINTS_TOTAL,initial_density_pressure);
+		glGetNamedBufferSubData(m_vbo[POSITION_A],0,sizeof(vmath::vec3)*POINTS_TOTAL,initial_positions);
+		glGetNamedBufferSubData(m_vbo[VELOCITY_A],0,sizeof(vmath::vec4)*POINTS_TOTAL,initial_velocities);
+		glGetNamedBufferSubData(m_vbo[DENSITY_A],0,sizeof(vmath::vec2)*POINTS_TOTAL,initial_density_pressure);
 
-	std::ofstream myfile;
-  myfile.open(filename,std::ofstream::binary); 
-  myfile.write((char*)initial_positions,sizeof(vmath::vec3)*POINTS_TOTAL);
-  myfile.write((char*)initial_velocities,sizeof(vmath::vec4)*POINTS_TOTAL);
-  myfile.write((char*)initial_density_pressure,sizeof(vmath::vec2)*POINTS_TOTAL);
+		std::ofstream myfile;
+		myfile.open(filename,std::ofstream::binary); 
+		myfile.write((char*)initial_positions,sizeof(vmath::vec3)*POINTS_TOTAL);
+		myfile.write((char*)initial_velocities,sizeof(vmath::vec4)*POINTS_TOTAL);
+		myfile.write((char*)initial_density_pressure,sizeof(vmath::vec2)*POINTS_TOTAL);
 		myfile.close();
+		delete initial_positions;
+		delete initial_velocities;
+		delete initial_density_pressure;
+	}
+	template <class T>
+	std::vector<T, std::allocator<T>> vectorFromPointer(T *sourceArray, size_t arraySize) {
+		std::vector<T, std::allocator<T> > targetVector();
+		typename std::_Vector_base<T, std::allocator<T> >::_Vector_impl *vectorPtr =
+			(typename std::_Vector_base<T, std::allocator<T> >::_Vector_impl *)((void *)&targetVector);
+		vectorPtr->_M_start = sourceArray;
+		vectorPtr->_M_finish = vectorPtr->_M_end_of_storage = vectorPtr->_M_start + arraySize;
+		return targetVector
+	}
+
+
+	void isAnyNanInf(){
+		//std::unique_ptr<vmath::vec3[]> initial_positions(new vmath::vec3[POINTS_TOTAL]);
+		//std::unique_ptr<vmath::vec4[]> initial_velocities(new vmath::vec4[POINTS_TOTAL]);
+		//std::unique_ptr<vmath::vec2[]> initial_density_pressure(new vmath::vec2[POINTS_TOTAL]);
+
+		std::vector<vmath::vec3> initial_positions(POINTS_TOTAL);
+		std::vector<vmath::vec4> initial_velocities(POINTS_TOTAL);
+		std::vector<vmath::vec2> initial_density_pressure(POINTS_TOTAL);
+
+		glGetNamedBufferSubData(m_vbo[POSITION_A], 0, sizeof(vmath::vec3)*POINTS_TOTAL, initial_positions.data());
+		glGetNamedBufferSubData(m_vbo[VELOCITY_A], 0, sizeof(vmath::vec4)*POINTS_TOTAL, initial_velocities.data());
+		glGetNamedBufferSubData(m_vbo[DENSITY_A], 0, sizeof(vmath::vec2)*POINTS_TOTAL, initial_density_pressure.data());
+
+		bool isNan = false;
+		for (vmath::vec3 p : initial_positions){
+			if (std::isnan(p.x()))
+				isNan = true;
+			if (std::isnan(p.y()))
+				isNan = true;
+			if (std::isnan(p.z()))
+				isNan = true;
+
+			if (std::isinf(p.x()))
+				isNan = true;
+			if (std::isinf(p.y()))
+				isNan = true;
+			if (std::isinf(p.z()))
+				isNan = true;
+
+		}
+		DBOUT("\nIsNan Pos : " << isNan);
+
+		isNan = false;
+		for (auto p : initial_velocities){
+			if (std::isnan(p.x()))
+				isNan = true;
+			if (std::isnan(p.y()))
+				isNan = true;
+			if (std::isnan(p.z()))
+				isNan = true;
+			if (std::isnan(p.w()))
+				isNan = true;
+
+			if (std::isinf(p.x()))
+				isNan = true;
+			if (std::isinf(p.y()))
+				isNan = true;
+			if (std::isinf(p.z()))
+				isNan = true;
+			if (std::isinf(p.w()))
+				isNan = true;
+		}
+		DBOUT("\nIsNan Vel : " << isNan);
+
+		isNan = false;
+		for (auto p : initial_density_pressure){
+			if (std::isnan(p.x()))
+				isNan = true;
+			if (std::isnan(p.y()))
+				isNan = true;		
+
+			if (std::isinf(p.x()))
+				isNan = true;
+			if (std::isinf(p.y()))
+				isNan = true;
+			
+		}
+		DBOUT("\nIsNan Pres : " << isNan);
+		
+		//for (auto p : pos)
+
 	}
 
     void saveParticlesAsText(std::string filename){
@@ -863,6 +955,10 @@ public:
 		  myfile<<initial_density_pressure[i][0]<<"\t"<<initial_density_pressure[i][1]<<std::endl;
 	} 
 		myfile.close();
+
+		delete[] initial_positions;
+		delete[] initial_velocities;
+		delete[] initial_density_pressure;
 	}
 
 template <typename T>
@@ -1104,7 +1200,9 @@ vmath::vec3  vertices[] = {v[0] , v[1] , v[2] , v[3] ,v[0]};
 		glUniform3fv(repulsC_loc,1,repulsC);
 	
         for (i = iterations_per_frame; i != 0; --i)
-        {			
+        {	
+			m_iteration_index++;
+
 			vec4 tmp_sphere1_CurentInterpol = mix(sphere1_CurentInterpol, sphere1, 0.01);
 			vec3 tmp_sphere1_speed = *((vec3*)&tmp_sphere1_CurentInterpol) - (*((vec3*)&sphere1_CurentInterpol));
 			sphere1_CurentInterpol = tmp_sphere1_CurentInterpol;
@@ -1116,20 +1214,28 @@ vmath::vec3  vertices[] = {v[0] , v[1] , v[2] , v[3] ,v[0]};
 			
 #if(OPTIM_STRUCT==4||OPTIM_STRUCT==5)		
 				//glFinish();		
+			
+			//m_iteration_index+=CHUNK_COUNT/2 ;//5;
+			//std::this_thread::sleep_for(std::chrono::milliseconds(10));
+			if (fence[(m_iteration_index) & 1] != 0){
+				glGetSynciv(fence[(m_iteration_index) & 1], GL_SYNC_STATUS, sizeof(int), nullptr, &isSignaled);
+				stalling = isSignaled == GL_UNSIGNALED;
+				glClientWaitSync(fence[(m_iteration_index)& 1], 0, GL_TIMEOUT_IGNORED);
+				glGetSynciv(fence[(m_iteration_index) & 1], GL_SYNC_STATUS, sizeof(int), nullptr, &isSignaled);
+								
+				glDeleteSync(fence[(m_iteration_index) & 1]);
+			}
 
-				m_iteration_index+=CHUNK_COUNT/2 ;//5;
-				if(fence[(m_iteration_index) %CHUNK_COUNT]!=0){
-					glGetSynciv(fence[(m_iteration_index) %CHUNK_COUNT], GL_SYNC_STATUS, sizeof(int), nullptr, &isSignaled);
-					stalling = isSignaled == GL_UNSIGNALED;
-					glClientWaitSync(fence[(m_iteration_index) %CHUNK_COUNT], 0, GL_TIMEOUT_IGNORED);
-					glDeleteSync(fence[(m_iteration_index) %CHUNK_COUNT]);				
-				}
-					((OptimiserThreadPoolListsOfLists*)gridOptimiser)->join_Workers();
-						glFlushMappedNamedBufferRange(m_grdBufferChunks_vbo[((m_iteration_index)%CHUNK_COUNT)],0,GRIDLIST_SIZE);
-gridOptimiser->fillList(pointsBuffer[(m_iteration_index) & 1],gridBuffer[(m_iteration_index) %CHUNK_COUNT],glass_pos);
-				
-				m_iteration_index-=CHUNK_COUNT/2;//5;
+			
 
+	
+			gridOptimiser->join_Workers();		
+			glFlushMappedNamedBufferRange(m_grdBufferChunks_vbo[((m_iteration_index) & 1)], 0, GRIDLIST_SIZE);
+
+			gridOptimiser->fillList(pointsBuffer[(m_iteration_index)& 1], gridBuffer[(m_iteration_index + 1) & 1], glass_pos);
+			
+			//m_iteration_index-=CHUNK_COUNT/2;//5;
+			
 
 #elif(OPTIM_STRUCT >0)
 			int * gridBuffer = (int *)glMapNamedBufferRange(m_vbo[GRIDLIST_A + (m_iteration_index & 1)], 0, GRIDLIST_SIZE, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
@@ -1140,30 +1246,31 @@ gridOptimiser->fillList(pointsBuffer[(m_iteration_index) & 1],gridBuffer[(m_iter
 			glUnmapNamedBuffer(m_vbo[POSITION_A + (m_iteration_index & 1)]);
 #endif
 			std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
-			optTime = std::chrono::duration_cast<std::chrono::microseconds>( t2 - t1 ).count()/1000.0;
+			optTime = std::chrono::duration_cast<std::chrono::microseconds>( t2 - t1 ).count()/1000.0;//OptimJoin
 		
 			glActiveTexture(GL_TEXTURE1);
             glBindTexture(GL_TEXTURE_BUFFER, m_vel_tbo[m_iteration_index & 1]);			
 			glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_BUFFER, m_pos_tbo[m_iteration_index & 1]);
 			glActiveTexture(GL_TEXTURE2);
-            glBindTexture(GL_TEXTURE_BUFFER, m_GRIDLIST_tbo[m_iteration_index %CHUNK_COUNT]);
+			glBindTexture(GL_TEXTURE_BUFFER, m_GRIDLIST_tbo[m_iteration_index & 1]);
 			glActiveTexture(GL_TEXTURE3);
             glBindTexture(GL_TEXTURE_BUFFER, m_density_tbo[m_iteration_index & 1]);
 			//
-            m_iteration_index++;
-            glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, m_vbo[POSITION_A + (m_iteration_index & 1)]);
-            glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 1, m_vbo[VELOCITY_A + (m_iteration_index & 1)]);
-			glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 2, m_vbo[DENSITY_A  + (m_iteration_index & 1)]);
-
+            //m_iteration_index++;//the only increment
+            glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, m_vbo[POSITION_A + ((m_iteration_index + 1) & 1)]);
+			glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 1, m_vbo[VELOCITY_A + ((m_iteration_index + 1) & 1)]);
+			glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 2, m_vbo[DENSITY_A + ((m_iteration_index + 1) & 1)]);
 			glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 3, m_vbo[COLORS]);
 
 			glBeginQuery(GL_TIME_ELAPSED, timerQueries[0]);
-            glBeginTransformFeedback(GL_POINTS);
-            glDrawArrays(GL_POINTS, 0, POINTS_TOTAL);
-            glEndTransformFeedback();
+			glBeginTransformFeedback(GL_POINTS);
+			glDrawArrays(GL_POINTS, 0, POINTS_TOTAL);
+			glEndTransformFeedback();
 			glEndQuery(GL_TIME_ELAPSED);
-			fence[(m_iteration_index-1 )%CHUNK_COUNT] = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+			fence[(m_iteration_index + 1) & 1] = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+		
+			
         }
 
         glDisable(GL_RASTERIZER_DISCARD);
@@ -1175,27 +1282,26 @@ gridOptimiser->fillList(pointsBuffer[(m_iteration_index) & 1],gridBuffer[(m_iter
 		render_SkyBox();
 		}
 	 if (draw_points)
-        {	
-		
-		glUseProgram(m_render_program);		
-		glUniformMatrix4fv(proj_mat_loc, 1, GL_FALSE, proj_matrix);       
-		vmath::mat4 mv_mat = v_matrix*m_matrix;
-        glUniformMatrix4fv(mv_mat_loc, 1, GL_FALSE, mv_mat);
-		glUniform3fv(light_pos_loc,1,light_pos);  
+        {			
+			glUseProgram(m_render_program);		
+			glUniformMatrix4fv(proj_mat_loc, 1, GL_FALSE, proj_matrix);       
+			vmath::mat4 mv_mat = v_matrix*m_matrix;
+			glUniformMatrix4fv(mv_mat_loc, 1, GL_FALSE, mv_mat);
+			glUniform3fv(light_pos_loc,1,light_pos);  
          
 			glBindVertexArray(render_balls_vao);
 			glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_BUFFER, m_pos_tbo[(m_iteration_index+1) & 1]);
+            glBindTexture(GL_TEXTURE_BUFFER, m_pos_tbo[(m_iteration_index) & 1]);
 			glActiveTexture(GL_TEXTURE1);
-            glBindTexture(GL_TEXTURE_BUFFER, m_GRIDLIST_tbo[(m_iteration_index+1) & 1]);
+            glBindTexture(GL_TEXTURE_BUFFER, m_GRIDLIST_tbo[(m_iteration_index) & 1]);
 			glActiveTexture(GL_TEXTURE2);
 			glBindTexture(GL_TEXTURE_BUFFER, m_color_tbo);
 			glActiveTexture(GL_TEXTURE3);
-            glBindTexture(GL_TEXTURE_BUFFER, m_density_tbo[(m_iteration_index+1) & 1]);
+            glBindTexture(GL_TEXTURE_BUFFER, m_density_tbo[(m_iteration_index) & 1]);
 			glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0,VERT_PER_BALL/3, POINTS_TOTAL);		
 		}
 		if(draw_raytrace){
-			m_iteration_index--;
+			//m_iteration_index--;
 			fillDensityFieldTexture();
 			glDisable(GL_DEPTH_TEST);
 			/*glEnable(GL_STENCIL_TEST);
@@ -1238,7 +1344,7 @@ gridOptimiser->fillList(pointsBuffer[(m_iteration_index) & 1],gridBuffer[(m_iter
 			glBindTexture(GL_TEXTURE_CUBE_MAP, envMapTex);
 			glActiveTexture(GL_TEXTURE6);
 			glBindTexture(GL_TEXTURE_3D, density_Field_Texture);
-			m_iteration_index++;
+			//m_iteration_index++;
 			glDrawArrays(GL_TRIANGLE_STRIP, 0,4);
 			glEnable(GL_DEPTH_TEST);
 			glStencilMask(0xFF);
@@ -1392,7 +1498,9 @@ private:
 				case 'B': saveParticles("initParticlesState.dat");
                     break;
 				case 'H': saveParticlesAsText("textDump");
-                    break;
+					break;
+				case 'I': isAnyNanInf();
+					break;
                 case GLFW_KEY_KP_ADD:iterations_per_frame++;
                     break;
 				case GLFW_KEY_KP_SUBTRACT:  iterations_per_frame = iterations_per_frame>0?iterations_per_frame-1:0;
@@ -1619,10 +1727,10 @@ private:
 	GLuint			timerQueries[2];
     GLuint          m_vao[2];
     GLuint          m_vbo[8];
-	GLuint          m_grdBufferChunks_vbo[CHUNK_COUNT];
+	GLuint          m_grdBufferChunks_vbo[2];
     GLuint          m_index_buffer;
 	GLuint			m_index_triangles_buffer;
-    GLuint          m_GRIDLIST_tbo[CHUNK_COUNT];
+    GLuint          m_GRIDLIST_tbo[2];
 	GLuint          m_pos_tbo[2];
 	GLuint          m_vel_tbo[2];
 	GLuint          m_density_tbo[2];
@@ -1683,7 +1791,7 @@ private:
 	GLuint render_fluid_ray_trace_vao;
 	GLuint render_skybox_vao;
 
-	GLsync   fence[CHUNK_COUNT];
+	GLsync   fence[2];
 	GLint	 isSignaled;
 	bool stalling;
 
@@ -1704,7 +1812,7 @@ private:
 	vmath::vec3 atractC;
 	vmath::vec3 repulsC;
 
-	int * gridBuffer[CHUNK_COUNT] ;
+	int * gridBuffer[2] ;
 	vmath::vec3 * pointsBuffer[2];
 	  
 	  float               fps;
