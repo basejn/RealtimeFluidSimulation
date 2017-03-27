@@ -1,0 +1,9 @@
+https://software.intel.com/en-us/articles/fluid-simulation-for-video-games-part-16/
+Предлагат 2 формули за изчисляване на градиента на плътността. едната на границите със стени и тела(Аi-Aj) , а другата са висчки останали места (Ai). 
+
+https://software.intel.com/en-us/articles/fluid-simulation-for-video-games-part-15
+This special form resembles von Neumann-Richtmyer artificial viscosity, which was invented in 1950 to reduce shock oscillations in fluid simulations. Shocks form when fluid moves faster than the speed of sound.
+
+Interaction with Bodies
+
+Surface Tension ? pro4eti nakyde po taq tema .

@@ -7,7 +7,7 @@ layout (location = 0) in vec3 position;
 // This is the current velocity of the vertex
 layout (location = 1) in vec4 velocity_mass;
 
-layout (location = 2) in vec4 density_pressure;
+layout (location = 2) in vec2 density_pressure;
 
 //layout (location = 3) in vec4 color;
 
@@ -41,7 +41,7 @@ uniform float rest_density=0.8;
 uniform float eta=1.50;//viscosity
 uniform float dens_K=20.5;
 uniform float sigma=1.0;
-uniform float surfTensTresh=0.002;//0.20;
+uniform float surfTensTresh=0.02;//0.20;
 uniform float deltaT=0.050;
 const float h=1.5;
 #define OPTIM_STRUCT  1//0=no 1=array 2=lists
@@ -157,26 +157,33 @@ float laplacian_W_poly6(float r){
 			vec2 n_density_pressure = texelFetch(tex_density,i).xy;
 			vec4 n_velocity_mass = texelFetch(tex_velocity,i);
 			new_density_pressure.x+=n_velocity_mass.w*W_poly6(dst);
-			pressureF +=n_velocity_mass.w*(density_pressure.y+n_density_pressure.y)/(2*n_density_pressure.x)*gradient_W_spiky(dst)*dstV;			
+			pressureF +=n_velocity_mass.w*(density_pressure.y+n_density_pressure.y)/(2*n_density_pressure.x)*gradient_W_spiky(dst)*dstV;
+			
+			//pressureF +=density_pressure.x *n_velocity_mass.w*(density_pressure.y/(density_pressure.x*density_pressure.x)+n_density_pressure.y/(n_density_pressure.x*n_density_pressure.x))*gradient_W_spiky(dst)*dstV;
+				
 			viscosityF+=eta*n_velocity_mass.w*((n_velocity_mass.xyz-velocity_mass.xyz))/n_density_pressure.x*laplacian_W_viscosity(dst);
 			color_field_gradient+=n_velocity_mass.w/n_density_pressure.x*gradient_W_poly6(dst)*dstV;
+			//color_field_gradient+=n_velocity_mass.w/n_density_pressure.x*vec3(gradient_W_poly6(dstV.x),gradient_W_poly6(dstV.y),gradient_W_poly6(dstV.z));
 			//color_field_laplacian+=n_velocity_mass.w/n_density_pressure.x*laplacian_W_poly6(dst)*dstV;
-			color_field_laplacian+=-n_velocity_mass.w/n_density_pressure.x*laplacian_W_poly6(dst);
+			color_field_laplacian+=n_velocity_mass.w/n_density_pressure.x*laplacian_W_poly6(dst);
 			}			
 	}
 	void forEveryWall(vec4 plane){
 			vec3 dstV =-plane.xyz;						
-			float dst = (dot(position.xyz,plane.xyz)+plane.w);			
-			if(abs(dst)<=h){			
+			float dst = (dot(position.xyz,plane.xyz)+plane.w);	
+			float hWall = h;
+			if(abs(dst)<=hWall){			
 			//if(abs(dst)<0.001){return;	dstV=vec3(1,1,1);dst=1;}
 			vec2 n_density_pressure =wall_density_preassure;
 			vec4 n_velocity_mass = vec4(0,0,0,wall_mass);
 			new_density_pressure.x+=n_velocity_mass.w*W_poly6(dst);
 			pressureF +=n_velocity_mass.w*(density_pressure.y+n_density_pressure.y)/(2*n_density_pressure.x)*gradient_W_spiky(dst)*dstV;			
-			viscosityF+=eta*n_velocity_mass.w*((n_velocity_mass.xyz-velocity_mass.xyz))/n_density_pressure.x*laplacian_W_viscosity(dst);
+			viscosityF+=0.5*eta*n_velocity_mass.w*((n_velocity_mass.xyz-velocity_mass.xyz))/n_density_pressure.x*laplacian_W_viscosity(dst);
 			//color_field_gradient+=n_velocity_mass.w/n_density_pressure.x*gradient_W_poly6(dst)*dstV;
 			//color_field_laplacian+=n_velocity_mass.w/n_density_pressure.x*laplacian_W_poly6(dst)*dstV;	
-			color_field_gradient+=0.21*n_velocity_mass.w/n_density_pressure.x*gradient_W_poly6(dst)*dstV;
+			
+			//color_field_gradient+=-10.0*n_velocity_mass.w/n_density_pressure.x*gradient_W_poly6(dst)*dstV;
+			
 			//color_field_laplacian+=n_velocity_mass.w/n_density_pressure.x*laplacian_W_poly6(dst)*dstV;
 		//	color_field_laplacian+=-n_velocity_mass.w/n_density_pressure.x*laplacian_W_poly6(dst);
 			
@@ -193,10 +200,13 @@ float laplacian_W_poly6(float r){
 			vec4 n_velocity_mass = vec4(sphere1_speed,wall_mass);
 			new_density_pressure.x+=n_velocity_mass.w*W_poly6(dst);
 			pressureF +=n_velocity_mass.w*(density_pressure.y+n_density_pressure.y)/(2*n_density_pressure.x)*gradient_W_spiky(dst)*dstV;			
-			viscosityF+=eta*n_velocity_mass.w*((n_velocity_mass.xyz-velocity_mass.xyz))/n_density_pressure.x*laplacian_W_viscosity(dst);
+			//viscosityF+=eta*n_velocity_mass.w*((n_velocity_mass.xyz-velocity_mass.xyz))/n_density_pressure.x*laplacian_W_viscosity(dst);
+			
 			//color_field_gradient+=n_velocity_mass.w/n_density_pressure.x*gradient_W_poly6(dst)*dstV;
 			//color_field_laplacian+=n_velocity_mass.w/n_density_pressure.x*laplacian_W_poly6(dst)*dstV;	
-		color_field_gradient+=0.2*n_velocity_mass.w/n_density_pressure.x*gradient_W_poly6(dst)*dstV;
+		
+			//ecolor_field_gradient+=-50.2*n_velocity_mass.w/n_density_pressure.x*gradient_W_poly6(dst)*dstV;
+			
 			//color_field_laplacian+=n_velocity_mass.w/n_density_pressure.x*laplacian_W_poly6(dst)*dstV;
 		//	color_field_laplacian+=-n_velocity_mass.w/n_density_pressure.x*laplacian_W_poly6(dst);
 			
@@ -320,8 +330,10 @@ void main(void)
 	float gradientLength = length(color_field_gradient);	// normal vector na povyrninata
     if(gradientLength>=surfTensTresh)
 	{
-		//surf_tensF = -sigma*color_field_laplacian*(color_field_gradient/gradientLength);
-		surf_tensF = -sigma*(gradientLength*gradientLength*color_field_gradient);
+	    //float k = color_field_laplacian;
+		//surf_tensF =0.1*sigma*k*(color_field_gradient/gradientLength);
+		surf_tensF = -sigma*(color_field_gradient)*(gradientLength);
+		
     }
 
 	tf_color = int(clamp(length(color_field_gradient)*255.0,0,255));
@@ -335,19 +347,27 @@ if(position.x>8)total_force += vec3(0,0,-5);
 
 if(position.z<-8)total_force += vec3(5,0,0);
 if(position.z>8)total_force += vec3(-5,0,0);
-
-if(length(position.xz)>1)
+*/
+/*
+if(length(position.xz + vec2(3,4))<3)
 {
-total_force+=cross(position , vec3(0,-0.1,0));
-}//else{total_force+=cross(position , vec3(0,0.1,0));}
+total_force+=cross(position , vec3(0,0.9,0));
+}
+if(length(position.xz + vec2(-3,4))<3)
+{
+total_force+=cross(position , vec3(0,-0.9,0));
+}
 
-//*
+//else{total_force+=cross(position , vec3(0,0.1,0));}
+//*/
+
+/*
 if(position.y<-8)
 total_force+= vec3(position.x,0,position.z )*0.8;
 //*/
 
-vec3 acceleration = total_force/new_density_pressure.x*deltaT + wind_dir*wind_speed*deltaT;
-vec4 final_velocity_mass = vec4(velocity_mass.xyz + acceleration*deltaT,velocity_mass.w);
+vec3 acceleration = total_force/new_density_pressure.x + wind_dir*wind_speed;
+vec4 final_velocity_mass = vec4(velocity_mass.xyz + acceleration*deltaT*deltaT,velocity_mass.w);
 vec3 final_position = position + final_velocity_mass.xyz *deltaT;		
 	/*
 	

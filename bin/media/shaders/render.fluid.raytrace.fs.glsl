@@ -57,6 +57,14 @@ float W_poly6(float r){
 	const float h9=h3*h3*h3;
 	return (pow((h2-r*r),3)*315/(64*PI*h9));	
 	}
+float gradient_W_poly6(float r){	
+	const float h2=h*h;
+	const float h3=h*h*h;
+	const float h9=h3*h3*h3;
+	float h2rr2 = h2-r*r;
+	return ((-r)*(945/(32*PI*h9))*h2rr2*h2rr2);
+//return ((-r)*(945/(32*PI*h9))*pow(h2-r*r,2));	
+	}
    int CellIndex(vec3 point){
 		int cellIndex=0;
 		point=(point - glass_pos + offset)/cellSize;
@@ -98,9 +106,11 @@ float W_poly6(float r){
 			float dst = length(dstV);
 			if(dst<=h){
 			//dstV=normalize(dstV);			
+			vec2 n_density_pressure = texelFetch(tex_density,i).xy;
 			vec4 n_velocity_mass = texelFetch(tex_velocity,i);
 			tmpDensity+=n_velocity_mass.w*W_poly6(dst);			
 			tmpNorm-=dstV*n_velocity_mass.w*W_poly6(dst);
+			//tmpNorm-=n_velocity_mass.w/n_density_pressure.x*gradient_W_poly6(dst)*dstV;// this is more correct
 			
 			tmpColor=(tmpColor+ W_poly6(dst)*texelFetch(tex_color,i).xyzw);
 			}			
