@@ -1232,6 +1232,8 @@ vmath::vec3  vertices[] = {v[0] , v[1] , v[2] , v[3] ,v[0]};
 			gridOptimiser->join_Workers();		
 			glFlushMappedNamedBufferRange(m_grdBufferChunks_vbo[((m_iteration_index) & 1)], 0, GRIDLIST_SIZE);
 
+			if (requestRain > 0){ rain((m_iteration_index)& 1); requestRain--; }
+
 			gridOptimiser->fillList(pointsBuffer[(m_iteration_index)& 1], gridBuffer[(m_iteration_index + 1) & 1], glass_pos);
 			
 			//m_iteration_index-=CHUNK_COUNT/2;//5;
@@ -1433,6 +1435,20 @@ vmath::vec3  vertices[] = {v[0] , v[1] , v[2] , v[3] ,v[0]};
 	return cellIndex;	
 	}
 
+	void rain(int bufer){
+
+		float a =  rand() / (float)RAND_MAX;
+
+		for (int i = 0; i < POINTS_TOTAL; i++){		
+			if (vmath::length(pointsBuffer[bufer][i] - vec3(0,-4,0))<3){
+				
+
+				pointsBuffer[bufer][i] = vec3(pointsBuffer[bufer][i].x(), pointsBuffer[bufer][i].y() + 13, pointsBuffer[bufer][i].z());
+
+			}		
+		}
+	}
+
 private:
 	
 	struct KeyBuffer{
@@ -1500,6 +1516,11 @@ private:
 				case 'H': saveParticlesAsText("textDump");
 					break;
 				case 'I': isAnyNanInf();
+					break;
+				case 'M':
+				{
+							requestRain = 2;
+				}
 					break;
                 case GLFW_KEY_KP_ADD:iterations_per_frame++;
                     break;
@@ -1755,6 +1776,7 @@ private:
 	bool			draw_raytrace;
 	bool			draw_skybox;
     int             iterations_per_frame;
+	int				requestRain;
 
 	GLuint	mv_mat_skybox_loc;
 	GLuint	proj_mat_skybox_loc;
