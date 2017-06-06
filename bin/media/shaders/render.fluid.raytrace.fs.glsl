@@ -623,11 +623,29 @@ finalColor = mix(finalColor,firstReflColor,fresnelR) ;
 return finalColor;
 }
 
+void visualiseDensity(float tnear,float tfar){
+vec3 rOrig = fs_in.ray_origin;
+vec3 rDir = normalize(fs_in.ray_direction);
+float finalColor = 0;
+float numUpdates=0;
 
+for(float i =tnear;i<tfar;i+=0.1)
+{
+	numUpdates+=1;
+    vec3 hitPos = rOrig + rDir*(i);
+    float pr = preasureInPoint3DTexture(hitPos);
+	//if(pr>1){color=vec4(pr*0.5); return;}
+	finalColor= (finalColor+pr);
+}
+
+color=vec4(vec3(finalColor/numUpdates),1);
+}
 
 
 void main(void)
 {
+
+
 vec4 finalColor = vec4(0);
 vec3 rayDir = normalize(fs_in.ray_direction);
 /*   Rendering of the CUBE
@@ -642,6 +660,7 @@ vec3 rayDir = normalize(fs_in.ray_direction);
 	if(tnear==tfar)tnear =0;
 //*
 
+//visualiseDensity(tnear,tfar);return;
 
 
 
