@@ -626,7 +626,7 @@ return finalColor;
 void visualiseDensity(float tnear,float tfar){
 vec3 rOrig = fs_in.ray_origin;
 vec3 rDir = normalize(fs_in.ray_direction);
-float finalColor = 0;
+float finalColor = 1;
 float numUpdates=0;
 
 for(float i =tnear;i<tfar;i+=0.1)
@@ -635,10 +635,11 @@ for(float i =tnear;i<tfar;i+=0.1)
     vec3 hitPos = rOrig + rDir*(i);
     float pr = preasureInPoint3DTexture(hitPos);
 	//if(pr>1){color=vec4(pr*0.5); return;}
-	finalColor= (finalColor+pr);
+	//if(pr>0.05)
+	finalColor= (finalColor*(1-(pr*0.003)));
 }
 
-color=vec4(vec3(finalColor/numUpdates),1);
+color=vec4(vec3(1-finalColor*1),1);
 }
 
 
