@@ -599,7 +599,7 @@ public:
 		wind_speed=1.80f;
 		wind_dir = vmath::vec3(0.0f,-1.0f,0.0f);
 		glass_pos = vmath::vec3(0.0f,0.0f,0.0f);
-		sphere1= vmath::vec4(0.0f,0.0f,0.0f,2);
+		sphere1= vmath::vec4(0.0f,10.0f,0.0f,2);
 		sphere1_CurentInterpol = vmath::vec4(sphere1);
 		sphere1_speed= vmath::vec3(0.0f,0.0f,0.0f);
 		light_pos=vmath::vec3(10.0f,40.0f,30.0f);
@@ -847,7 +847,7 @@ public:
 			(typename std::_Vector_base<T, std::allocator<T> >::_Vector_impl *)((void *)&targetVector);
 		vectorPtr->_M_start = sourceArray;
 		vectorPtr->_M_finish = vectorPtr->_M_end_of_storage = vectorPtr->_M_start + arraySize;
-		return targetVector
+		return targetVector;
 	}
 
 
@@ -1145,7 +1145,7 @@ vmath::vec3  vertices[] = {v[0] , v[1] , v[2] , v[3] ,v[0]};
 
 	void fillDensityFieldTexture(){
 		glBindFramebuffer(GL_FRAMEBUFFER, density_Texture_FBO);
-		 glViewport(0, 0, DENSITY_TEX_SIDE, DENSITY_TEX_SIDE);
+		glViewport(0, 0, DENSITY_TEX_SIDE, DENSITY_TEX_SIDE);
 		glBindVertexArray(fill_density_Texture_VAO);
 		glUseProgram(m_fill_DensityField_program);
 		glActiveTexture(GL_TEXTURE0);
