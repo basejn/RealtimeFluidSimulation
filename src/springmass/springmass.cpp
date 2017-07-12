@@ -1334,6 +1334,7 @@ public:
 		glUniform3fv(repulsC_loc, 1, repulsC);
 
 		for (int i = iterations_per_frame; i != 0; --i)
+
 		{
 			m_iteration_index++;
 
