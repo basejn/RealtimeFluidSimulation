@@ -39,6 +39,9 @@
 *.log
 *.scc
 
+\documentation\diplomna
+\documentation\diplomna.zip
+
 # Visual C++ cache files
 ipch/
 *.aps
