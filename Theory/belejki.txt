@@ -1,3 +1,5 @@
+First!!! cache locality . instaed of indices store the data for the particles in the lists of the grid .
+
 https://software.intel.com/en-us/articles/fluid-simulation-for-video-games-part-16/
 Предлагат 2 формули за изчисляване на градиента на плътността. едната на границите със стени и тела(Аi-Aj) , а другата са висчки останали места (Ai). 
 
@@ -6,4 +8,7 @@ This special form resembles von Neumann-Richtmyer artificial viscosity, which wa
 
 Interaction with Bodies
 
-Surface Tension ? pro4eti nakyde po taq tema .
+Surface Tension ? pro4eti nakyde po taq tema . why not try Becker & Teschner 2007 - http://www.cs.columbia.edu/~batty/teaching/COMS6998/SPH_overview.pdf @ 35 page
+
+Rest preasure - Tait equation. instead of p = k(q-q0) -> p = B((q/q0)^y-1)
+

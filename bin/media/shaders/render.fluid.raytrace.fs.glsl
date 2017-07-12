@@ -647,138 +647,128 @@ void main(void)
 {
 
 
-vec4 finalColor = vec4(0);
-vec3 rayDir = normalize(fs_in.ray_direction);
-/*   Rendering of the CUBE
+	vec4 finalColor = vec4(0);
+	vec3 rayDir = normalize(fs_in.ray_direction);
+    /*
+	Rendering of the CUBE
 	vec3 hitPos; vec3 hitNorm;
 	float closestT = rendHitTheCube( hitPos,hitNorm);
 	if(closestT<length(fs_in.ray_origin)+30)
 	finalColor = vec4(1)*(dot(-rayDir,hitNorm));	
-	//*/
-	
-	 float tnear,tfar;
+		//*/
+		
+	float tnear,tfar;
 	bool exit =  intersectionsOfTheCube(tnear,tfar,fs_in.ray_origin,rayDir);
 	if(tnear==tfar)tnear =0;
-//*
+	//*
 
-//visualiseDensity(tnear,tfar);return;
+	//visualiseDensity(tnear,tfar);return;
 
+	/* 
+	for(float i=tnear;i<tfar;i+=0.2){
+	 if(length((fs_in.ray_origin+rayDir*i)-sphere1.xyz)<sphere1.w){
+	  color = vec4(0);
+	 return;
+	 }
+	}
+	//*/
 
+	//{color= vec4(fs_in.ray_origin*vec3(0,0,1),1);return;}
 
+	float firstSphereT = intersect_ray_sphere2(fs_in.ray_origin,rayDir,sphere1);
+	//if(firstSphereT>0){color= vec4(0);return;}
 
-/* 
-for(float i=tnear;i<tfar;i+=0.2){
- if(length((fs_in.ray_origin+rayDir*i)-sphere1.xyz)<sphere1.w){
-  color = vec4(0);
- return;
- }
-}
-//*/
+	vec3 firstOrig ;
+	vec3 firstWaterNorm;
+	float firstWaterT = findIsosurface( tnear, tfar,true,fs_in.ray_origin,rayDir,firstOrig,firstWaterNorm);
 
-//{color= vec4(fs_in.ray_origin*vec3(0,0,1),1);return;}
+	if(firstSphereT==0&&firstWaterT==0)discard;
 
+	if(firstSphereT>0&&(firstSphereT<firstWaterT ||firstWaterT==0)){
+		finalColor = sphereColor;
+		vec3 firstSphereNormal = -normalize((fs_in.ray_origin + rayDir*firstSphereT) - sphere1.xyz);
+		vec3 reflDir=reflect(rayDir,firstSphereNormal);
+		float fresnelR = fresnelTermAprox(rayDir,-firstSphereNormal/15,air_n/fluid_n);
+		vec4 firstReflColor ;//=texture(tex_cubemap, reflDir);
 
-float firstSphereT = intersect_ray_sphere2(fs_in.ray_origin,rayDir,sphere1);
-//if(firstSphereT>0){color= vec4(0);return;}
+		vec4 waterReflColor = calcFluidColor((fs_in.ray_origin + rayDir*firstSphereT),reflDir,0,20);
 
-vec3 firstOrig ;
-vec3 firstWaterNorm;
-float firstWaterT = findIsosurface( tnear, tfar,true,fs_in.ray_origin,rayDir,firstOrig,firstWaterNorm);
+		 if(waterReflColor.w>=0){
+		//firstReflColor = vec4(0);
+		firstReflColor=waterReflColor;
+		}else {
+			firstReflColor =texture(tex_cubemap, reflDir);
+		}
+			finalColor = mix(finalColor,firstReflColor,fresnelR) ;
+	}else
+		{
+		  
+		float curt = firstWaterT;    
+		//if(curt>0)
+		finalColor = calcLight(firstWaterNorm ,curt );
+		//if(curt>0)color = texture(tex_cubemap, cross(firstWaterNorm,-rayDir));else discard;return;
+		//color=finalColor;return;
+		vec3 reflDir=reflect(rayDir,firstWaterNorm);
+		float fresnelR = fresnelTermAprox(rayDir,firstWaterNorm,air_n/fluid_n);
 
-if(firstSphereT==0&&firstWaterT==0)discard;
+		vec4 reflSphereColor = calSphereColor(fs_in.ray_origin+rayDir*curt,reflDir,sphere1);
 
-if(firstSphereT>0&&(firstSphereT<firstWaterT ||firstWaterT==0)){
-finalColor = sphereColor;
-vec3 firstSphereNormal = -normalize((fs_in.ray_origin + rayDir*firstSphereT) - sphere1.xyz);
-vec3 reflDir=reflect(rayDir,firstSphereNormal);
-float fresnelR = fresnelTermAprox(rayDir,-firstSphereNormal/15,air_n/fluid_n);
-vec4 firstReflColor ;//=texture(tex_cubemap, reflDir);
+		vec4 firstReflColor;
+		if(reflSphereColor.w>=0) firstReflColor = reflSphereColor;
+		else firstReflColor = texture(tex_cubemap, reflDir);
+		finalColor = mix(finalColor,firstReflColor,fresnelR) ;
 
-vec4 waterReflColor = calcFluidColor((fs_in.ray_origin + rayDir*firstSphereT),reflDir,0,20);
+		vec3 newDir=refract(rayDir,firstWaterNorm,air_n/fluid_n);
+		vec3 secondOrig;
+		vec3 secondNorm;
+		curt =  findIsosurface( 0, 20,false,firstOrig,newDir,secondOrig,secondNorm);
 
- if(waterReflColor.w>=0){
-//firstReflColor = vec4(0);
-firstReflColor=waterReflColor;
-}else {
-firstReflColor =texture(tex_cubemap, reflDir);
-}
-finalColor = mix(finalColor,firstReflColor,fresnelR) ;
-}else
-{
-  
-float curt = firstWaterT;    
-//if(curt>0)
-finalColor = calcLight(firstWaterNorm ,curt );
-//if(curt>0)color = texture(tex_cubemap, cross(firstWaterNorm,-rayDir));else discard;return;
-//color=finalColor;return;
-vec3 reflDir=reflect(rayDir,firstWaterNorm);
-float fresnelR = fresnelTermAprox(rayDir,firstWaterNorm,air_n/fluid_n);
+		float refrSphereT = intersect_ray_sphere2(secondOrig,-secondNorm,sphere1);
 
+		vec4 firstRefrColor = tmpColor;
+		//if(refrSphereT>0) firstRefrColor =mix(sphereColor,firstRefrColor,0.4);
 
-vec4 reflSphereColor = calSphereColor(fs_in.ray_origin+rayDir*curt,reflDir,sphere1);
+		finalColor =mix(finalColor,firstRefrColor,0.34*(1-fresnelR));
 
-vec4 firstReflColor;
-if(reflSphereColor.w>=0) firstReflColor = reflSphereColor;
-else firstReflColor = texture(tex_cubemap, reflDir);
-finalColor = mix(finalColor,firstReflColor,fresnelR) ;
+		vec3 thirdDir=refract(newDir,-secondNorm,fluid_n/air_n);
 
-vec3 newDir=refract(rayDir,firstWaterNorm,air_n/fluid_n);
-vec3 secondOrig;
-vec3 secondNorm;
-curt =  findIsosurface( 0, 20,false,firstOrig,newDir,secondOrig,secondNorm);
+		// float fresnelR2 = 0;//fresnelTerm(newDir,secondNorm,fluid_n/air_n);
+		if(thirdDir!=vec3(0)){
+			vec4 sphereRflColor =calSphereColor(secondOrig,thirdDir,sphere1);
+			vec4 refrOutRayColor;
 
-float refrSphereT = intersect_ray_sphere2(secondOrig,-secondNorm,sphere1);
+			if(sphereRflColor.w>=0){
+				refrOutRayColor = sphereRflColor;
+			}
+			else refrOutRayColor = texture(tex_cubemap, thirdDir);
 
-vec4 firstRefrColor = tmpColor;
-//if(refrSphereT>0) firstRefrColor =mix(sphereColor,firstRefrColor,0.4);
+			//finalColor += vec4(1)*pow(max(dot(thirdDir,normalize(light_pos-secondOrig)),0),8);
+			finalColor=mix(finalColor,refrOutRayColor,0.85*(1-fresnelR));
+		}//else finalColor = vec4(0);
+		//else 
+		finalColor = mix(finalColor,texture(tex_cubemap, newDir),0.6475*(1-fresnelR)) ;
 
-finalColor =mix(finalColor,firstRefrColor,0.34*(1-fresnelR));
+	}
+	  
+	/*
+	float samples=0;float i;
+	  for( i=tfar;i>tnear;i-=0.2){
+	  float pr = preasureInPoint(fs_in.ray_origin + rayDir*(i));
+	  if(pr>0.1)
+	  {
+	//  finalColor = vec4(pr/isosurfDens);
+	 // finalColor = vec4(1)*dot(tmpNorm,-rayDir);
+	 samples+=1;
+	  finalColor =(finalColor + pr*i)/1;
+	 //break;
+	  }
 
-vec3 thirdDir=refract(newDir,-secondNorm,fluid_n/air_n);
+	 } 
 
-// float fresnelR2 = 0;//fresnelTerm(newDir,secondNorm,fluid_n/air_n);
-if(thirdDir!=vec3(0)){
-vec4 sphereRflColor =calSphereColor(secondOrig,thirdDir,sphere1);
-vec4 refrOutRayColor;
+	 finalColor/=samples*tfar*2;
+	   if(finalColor==vec4(0)) discard;
+	//*/
+		
 
-if(sphereRflColor.w>=0){
-refrOutRayColor = sphereRflColor;
-}
-else refrOutRayColor = texture(tex_cubemap, thirdDir);
-
-//finalColor += vec4(1)*pow(max(dot(thirdDir,normalize(light_pos-secondOrig)),0),8);
-finalColor=mix(finalColor,refrOutRayColor,0.85*(1-fresnelR)) ;
-
-}//else finalColor = vec4(0);
-//else 
-
-finalColor = mix(finalColor,texture(tex_cubemap, newDir),0.6475*(1-fresnelR)) ;
-
-}
-
-
-
-  
-/*
-float samples=0;float i;
-  for( i=tfar;i>tnear;i-=0.2){
-  float pr = preasureInPoint(fs_in.ray_origin + rayDir*(i));
-  if(pr>0.1)
-  {
-//  finalColor = vec4(pr/isosurfDens);
- // finalColor = vec4(1)*dot(tmpNorm,-rayDir);
- samples+=1;
-  finalColor =(finalColor + pr*i)/1;
- //break;
-  }
-
- } 
-
- finalColor/=samples*tfar*2;
-   if(finalColor==vec4(0)) discard;
-//*/
-	
-
-color=finalColor;
-
+	color=finalColor;
 }
