@@ -4,6 +4,7 @@
 
 #define _USE_MATH_DEFINES  1 // Include constants defined in math.h
 #include <math.h>
+#include<iostream>
 
 namespace vmath
 {
@@ -243,6 +244,15 @@ public:
         return result;
     }
 
+	std::ostream& operator<<(std::ostream& stream) {
+		stream << "[";
+		for (int i = 0; i < len; i++)
+			stream << " " << data[i];
+		stream << " ]";
+		return stream;
+	}
+	friend std::ostream& operator<<(std::ostream& os, const vecN& dt);
+
 protected:
     T data[len];
 
@@ -253,7 +263,14 @@ protected:
             data[n] = that.data[n];
     }
 };
-
+template<typename T, int len>
+	std::ostream& operator<<(std::ostream& stream, const vecN<T,len>& dt){
+	stream << "[";
+	for (int i = 0; i < len; i++)
+		stream << " " << data[i];
+	stream << " ]";
+	return stream;
+}
 template <typename T>
 class Tvec2 : public vecN<T,2>
 {

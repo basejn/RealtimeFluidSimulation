@@ -3,7 +3,7 @@
 layout (location = 0) out float density;
 
 layout (binding = 0) uniform samplerBuffer tex_position;
-layout (binding = 1) uniform samplerBuffer tex_velocity;
+//layout (binding = 1) uniform samplerBuffer tex_velocity;
 layout (binding = 2) uniform isamplerBuffer tex_gridlist;
 
 
@@ -52,17 +52,16 @@ float W_poly6(float r){
 	float tmpDensity=0;
 	vec3 curPos=vec3(0);
 	void forEveryParticle(int i){
-	vec3 npos = texelFetch(tex_position,i).xyz;			
-			vec3 dstV =npos-curPos;			
-			float dst = length(dstV);
-			if(dst<=h){				
+		vec3 npos = texelFetch(tex_position,i).xyz;			
+		vec3 dstV =npos-curPos;			
+		float dst = length(dstV);
+		if(dst<=h){				
 			float masss =1;// texelFetch(tex_velocity,i).w;
 			tmpDensity+=masss*W_poly6(dst);			
 			//tmpNorm-=dstV*n_velocity_mass.w*W_poly6(dst);			
 			//tmpColor=(tmpColor+ W_poly6(dst)*texelFetch(tex_color,i).xyzw);
-			}			
+		}			
 	}
-	
 	
 	
 	void doForCellIndexArrays(int myCell){	

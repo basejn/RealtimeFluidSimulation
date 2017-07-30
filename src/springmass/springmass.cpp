@@ -62,9 +62,9 @@ enum
 };
 
 #define INT_STATE_FROM_FILE 1
-#define OPTIM_STRUCT  5 //0=no 1=array 2=lists 3=listsParral 4=listsParralThreadPool 5=listsParralThreadPoolArrays
+#define OPTIM_STRUCT  6 //0=no 1=array 2=lists 3=listsParral 4=listsParralThreadPool 5=listsParralThreadPoolArrays 6=arrayAllNeighboursInCell
 
-const int GRID_SIDE = 15;
+const int GRID_SIDE =  15;
 const float GRID_VOLUME_SIDE = 20.0f; //+-10
 const float GRID_OFFSET = 10.0f; //+-10
 const float CELL_SIZE = GRID_VOLUME_SIDE / GRID_SIDE;
@@ -72,6 +72,8 @@ const int DENSITY_TEX_SIDE = 64;// trqbva da se promeni i v GeometryShadera
 const int CELL_COUNT = GRID_SIDE * GRID_SIDE * GRID_SIDE;
 #if (OPTIM_STRUCT ==1||OPTIM_STRUCT ==5)
 const int GRIDLIST_SIZE = (GRID_SIDE * GRID_SIDE * GRID_SIDE * 3 + POINTS_TOTAL) * sizeof(int);
+#elif (OPTIM_STRUCT ==6)
+const int GRIDLIST_SIZE = (GRID_SIDE * GRID_SIDE * GRID_SIDE * 3 * POINTS_TOTAL) * sizeof(int);
 #else
 const int GRIDLIST_SIZE = (GRID_SIDE*GRID_SIDE*GRID_SIDE*2+POINTS_TOTAL*2) * sizeof(int);
 #endif
@@ -668,6 +670,313 @@ private:
 	}*parameters;
 };
 
+class ArraysFromListsAllIndsPerCellThreadPoolOptimiser :public GridListsOfListsParralOptimiser
+{
+public:
+	ArraysFromListsAllIndsPerCellThreadPoolOptimiser(int pointsCount, int gridSide, float cellSize, float offset, int nThreads) : GridListsOfListsParralOptimiser(pointsCount, gridSide, cellSize, offset, nThreads)
+	{
+		this->nThreads = nThreads;
+		worker_Locs = new std::atomic<bool>[nThreads];
+		fillListTask_Locs = new std::atomic<bool>[nThreads];
+		gridListKernelParall_Locs = new std::atomic<bool>[nThreads];
+		gridBuffer = new int[pointsCount * 2 + gridSize * 2];
+		resetWorkers();
+		resetfillListTasks();
+		parameters = new params[nThreads];
+		for (int i = 0; i < nThreads; i++)
+		{
+			threads.emplace_back(std::thread(&ArraysFromListsAllIndsPerCellThreadPoolOptimiser::worker, this, i, &worker_Locs[i], &fillListTask_Locs[i], &gridListKernelParall_Locs[i]));
+		}
+		initNeighbourIndsCache();
+	}
+
+	std::chrono::high_resolution_clock::time_point t1;
+
+	void fillList(vmath::vec3* pointsBuffer, int* gridBuffer, vmath::vec3 offset_vec)
+	{
+		t1 = std::chrono::high_resolution_clock::now();
+
+		this->pointsBuffer = pointsBuffer;
+		//this->gridBuffer = gridBuffer;
+		outGridBuffer = gridBuffer;
+
+		this->offset_vec = offset_vec;
+		//fillListTask();
+		fillListTask_Locs[0] = (true);
+	}
+
+	void resetWorkers()
+	{
+		for (int i = 0; i < nThreads; i++)
+		{
+			worker_Locs[i].store(false);
+			gridListKernelParall_Locs[i].store(false);
+		}
+	}
+
+	void resetfillListTasks()
+	{
+		for (int i = 0; i < nThreads; i++)
+		{
+			fillListTask_Locs[i] = (false);
+		}
+	}
+
+	bool is_ready()
+	{
+		for (int i = 0; i < nThreads; i++)
+		{
+			if (worker_Locs[i].load() == true)return false;
+		}
+		return true;
+	}
+
+	void join_Workers()
+	{
+		//DBOUT("\n \t\t Joining");		
+		for (int i = 0; i < nThreads; i++)
+		{
+			while (fillListTask_Locs[i].load() == true);
+			while (worker_Locs[i].load() == true);
+		}
+	}
+
+private:
+	void printList(std::string fileName, int* gridBuffer)
+	{
+		std::ofstream myfile;
+		myfile.open(fileName);
+
+		for (int i = 0; i < (GRID_SIDE * GRID_SIDE * GRID_SIDE * 2 + POINTS_TOTAL * 2); i++)
+		{
+			myfile << "\n" << i << ":\t" << gridBuffer[i];
+		}
+		myfile.close();
+	}
+
+	void worker(int id, std::atomic<bool>* my_Lock, std::atomic<bool>* my_fillListTaskLock, std::atomic<bool>* my_gridListKernelParallLock)
+	{
+		while (true)
+		{
+			while ((*my_Lock).load() == false)
+			{
+				if ((*my_fillListTaskLock) == true)
+				{
+					fillListTask();
+				}
+			}
+
+			GridListKernelParall(id, parameters[id].firstPoint, parameters[id].nPoints);
+			(*my_gridListKernelParallLock).store(true);
+
+			if ((*my_fillListTaskLock) == true)
+			{
+				for (int i = 0; i < nThreads; i++)while (gridListKernelParall_Locs[i].load() == false);
+				gridArraysAllIndsPerCellFromListKernel();
+				optTime = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - t1).count() / 1000000.0);
+				(*my_fillListTaskLock) = (false);
+			}
+			(*my_Lock).store(false);
+		}
+	}
+	void initNeighbourIndsCache()
+	{
+		for (int i = 0; i < GRID_SIDE*GRID_SIDE*GRID_SIDE; i++){			
+			neighbourIndCache[i] = genNeighbourInds(i);
+		}
+	}
+	static std::vector<int> genNeighbourIndsOld(int i, const int GRID_SIDE = GRID_SIDE)
+	{
+		std::vector<int> inds{};
+		//for (int i = 0; i < GRID_SIDE*GRID_SIDE*GRID_SIDE; i++)inds.push_back(i);
+		//return inds;
+
+		int indss[3 * 3 * 3];
+		int ii = 0;
+		indss[ii++] = i;
+		indss[ii++] = i + GRID_SIDE;
+		indss[ii++] = i - GRID_SIDE;
+		indss[ii++] = i + 1;
+		indss[ii++] = i - 1;
+		indss[ii++] = i + GRID_SIDE + 1;
+		indss[ii++] = i - (GRID_SIDE + 1);
+		indss[ii++] = i + GRID_SIDE - 1;
+		indss[ii++] = i - (GRID_SIDE - 1);
+		i += GRID_SIDE*GRID_SIDE;
+		indss[ii++] = i;
+		indss[ii++] = i + GRID_SIDE;
+		indss[ii++] = i - GRID_SIDE;
+		indss[ii++] = i + 1;
+		indss[ii++] = i - 1;
+		indss[ii++] = i + GRID_SIDE + 1;
+		indss[ii++] = i - (GRID_SIDE + 1);
+		indss[ii++] = i + GRID_SIDE - 1;
+		indss[ii++] = i - (GRID_SIDE - 1);
+		i -= 2 * GRID_SIDE*GRID_SIDE;
+		indss[ii++] = i;
+		indss[ii++] = i + GRID_SIDE;
+		indss[ii++] = i - GRID_SIDE;
+		indss[ii++] = i + 1;
+		indss[ii++] = i - 1;
+		indss[ii++] = i + GRID_SIDE + 1;
+		indss[ii++] = i - (GRID_SIDE + 1);
+		indss[ii++] = i + GRID_SIDE - 1;
+		indss[ii++] = i - (GRID_SIDE - 1);
+
+		for (int i = 0; i < 3 * 3 * 3; i++)
+		{
+			if (indss[i] >= 0 && indss[i]<GRID_SIDE*GRID_SIDE*GRID_SIDE)
+				inds.push_back(indss[i]);
+		}
+
+		return inds;
+	}
+	inline static  int pointToIndex(ivec3* point)
+	{
+		int cellIndex = 0;
+		cellIndex = std::max(std::min(((((*point)[2]) )) * GRID_SIDE * GRID_SIDE, GRID_SIDE * GRID_SIDE * (GRID_SIDE - 1)), 0);
+		cellIndex += std::max(std::min(((((*point)[1]) )) * GRID_SIDE, GRID_SIDE * (GRID_SIDE - 1)), 0);
+		cellIndex += std::max(std::min(((((*point)[0]) )), (GRID_SIDE - 1)), 0);
+		return cellIndex;
+	}
+	static ivec3 indexToPoint(int i, const int GRID_SIDE=GRID_SIDE)
+	{
+		int x, y, z;
+		x = i % GRID_SIDE;
+		y = (i / GRID_SIDE) % (GRID_SIDE);
+		z = (i / (GRID_SIDE * GRID_SIDE)) % (GRID_SIDE);
+		return ivec3(x, y, z );
+	}
+	std::vector<int> genNeighbourInds(int i)
+	{
+		std::vector<int> inds{};
+				
+		auto point = indexToPoint(i);
+
+		//TODO Ima nqkyw byg. 
+	
+		int seta[GRID_SIDE*GRID_SIDE*GRID_SIDE]{0};
+		for (size_t j = 0; j < 27; j++)// all neigbouring points
+		{
+			seta[pointToIndex(new ivec3(point + ivec3(-1, -1, -1) + indexToPoint(j,3)))] = 1;
+		}
+		/*
+		int ofs = 1;
+		seta[pointToIndex(new ivec3(point + ivec3(0, 0, 0)))] = 1;
+		seta[pointToIndex(new ivec3(point + ivec3(0, -ofs, ofs)))] = 1;
+		seta[pointToIndex(new ivec3(point + ivec3(0, -ofs, -ofs)))] = 1;
+		seta[pointToIndex(new ivec3(point + ivec3(0, -ofs, 0)))] = 1;
+		seta[pointToIndex(new ivec3(point + ivec3(0, ofs, ofs)))] = 1;
+		seta[pointToIndex(new ivec3(point + ivec3(0, ofs, -ofs)))] = 1;
+		seta[pointToIndex(new ivec3(point + ivec3(0, ofs, 0)))] = 1;
+		seta[pointToIndex(new ivec3(point + ivec3(0, 0, ofs)))] = 1;
+		seta[pointToIndex(new ivec3(point + ivec3(0, 0, -ofs)))] = 1;
+
+		seta[pointToIndex(new ivec3(point + ivec3(ofs, 0, 0)))] = 1;
+		seta[pointToIndex(new ivec3(point + ivec3(ofs, -ofs, ofs)))] = 1;
+		seta[pointToIndex(new ivec3(point + ivec3(ofs, -ofs, -ofs)))] = 1;
+		seta[pointToIndex(new ivec3(point + ivec3(ofs, -ofs, 0)))] = 1;
+		seta[pointToIndex(new ivec3(point + ivec3(ofs, ofs, ofs)))] = 1;
+		seta[pointToIndex(new ivec3(point + ivec3(ofs, ofs, -ofs)))] = 1;
+		seta[pointToIndex(new ivec3(point + ivec3(ofs, ofs, 0)))] = 1;
+		seta[pointToIndex(new ivec3(point + ivec3(ofs, 0, ofs)))] = 1;
+		seta[pointToIndex(new ivec3(point + ivec3(ofs, 0, -ofs)))] = 1;
+
+		seta[pointToIndex(new ivec3(point + ivec3(-ofs, 0, 0)))] = 1;
+		seta[pointToIndex(new ivec3(point + ivec3(-ofs, -ofs, ofs)))] = 1;
+		seta[pointToIndex(new ivec3(point + ivec3(-ofs, -ofs, -ofs)))] = 1;
+		seta[pointToIndex(new ivec3(point + ivec3(-ofs, -ofs, 0)))] = 1;
+		seta[pointToIndex(new ivec3(point + ivec3(-ofs, ofs, ofs)))] = 1;
+		seta[pointToIndex(new ivec3(point + ivec3(-ofs, ofs, -ofs)))] = 1;
+		seta[pointToIndex(new ivec3(point + ivec3(-ofs, ofs, 0)))] = 1;
+		seta[pointToIndex(new ivec3(point + ivec3(-ofs, 0, ofs)))] = 1;
+		seta[pointToIndex(new ivec3(point + ivec3(-ofs, 0, -ofs)))] = 1;
+		*/
+		for (int i = 0; i < GRID_SIDE*GRID_SIDE*GRID_SIDE; i++)
+		{
+			if (seta[i])
+				inds.push_back(i);
+		}
+
+		return inds;
+	}
+	void gridArraysAllIndsPerCellFromListKernel()
+	{	
+		
+		int lastUsedIndex = gridSize * 2;
+		for (int curInd = 0; curInd < gridSize; curInd++)
+		{
+			//calculate new array size : sum of all neighbouring cells sizes
+			auto neighbours = &neighbourIndCache[curInd];// genNeighbourInds(curInd);			
+			
+			int curCelSize = 0;
+			for (auto neighbourCellInd : *neighbours)
+			{				
+				curCelSize += gridBuffer[neighbourCellInd * 2 + 1];
+			}
+			
+			//prepare new array
+			int curentParticlePosIndex = lastUsedIndex; //new array position
+			lastUsedIndex += curCelSize + 1;			//update new free memory position
+
+			outGridBuffer[curentParticlePosIndex + curCelSize+1] = 0;// null terminate last position of new array
+			outGridBuffer[curInd * 2] = curentParticlePosIndex;//new array position
+			outGridBuffer[curInd * 2 + 1] = curCelSize;//size of new array
+			
+			//fill indices from neighbours
+			for (auto neighbourCellInd : *neighbours)
+			{				
+				int curentIteratingIndex = gridBuffer[neighbourCellInd * 2];
+				while (curentIteratingIndex != 0)
+				{
+					outGridBuffer[curentParticlePosIndex++] = gridBuffer[curentIteratingIndex];
+					curentIteratingIndex = gridBuffer[curentIteratingIndex + 1];
+				}
+			}
+		}
+	}
+
+	
+
+	void fillListTask()
+	{
+		*lastUsedInd = (gridSize)-1;
+
+		//for(int i=0;i<gridSize*2;i++)gridBuffer[i]=0;//init buffer
+		memset(gridBuffer, 0, gridSize * 2 * sizeof(int));
+		int pointsPerKernel = pointsCount / (nThreads);
+		int pointsPerKernelRem = pointsCount % nThreads;
+
+		//DBOUT("\n");
+		//resetWorkers();
+		for (int i = 0; i < nThreads; i++)
+		{
+			int nPoints = pointsPerKernel;
+			if ((i) == (nThreads - 1))nPoints += pointsPerKernelRem;
+			//	v.emplace_back(std::thread(&GridListsOfListsParralOptimiser::GridListKernelParall,this,i,pointsPerKernel*i,nPoints));
+			//	GridListKernelParall(i,pointsPerKernel*i, nPoints);
+			parameters[i].firstPoint = pointsPerKernel * i;
+			parameters[i].nPoints = nPoints;
+			gridListKernelParall_Locs[i].store(false);
+			worker_Locs[i] = (true);
+		}
+	}
+
+	std::vector<int> neighbourIndCache[GRID_SIDE*GRID_SIDE*GRID_SIDE];
+	std::atomic<bool>* worker_Locs;
+	std::atomic<bool>* gridListKernelParall_Locs;
+	std::atomic<bool>* fillListTask_Locs;
+	int nThreads;
+	int* outGridBuffer;
+	std::vector<std::thread> threads;
+
+	struct params
+	{
+		int firstPoint;
+		int nPoints;
+	}*parameters;
+};
+//Last Variant
 
 class springmass_app : public sb7::application
 {
@@ -726,7 +1035,7 @@ public:
 	void startup(void)
 	{
 		glGenQueries(2, timerQueries);
-#if (OPTIM_STRUCT ==1)
+#if   (OPTIM_STRUCT ==1)
 		gridOptimiser =new GridListsOfArraysOptimiser(POINTS_TOTAL,GRID_SIDE,CELL_SIZE,GRID_OFFSET,1);		
 #elif (OPTIM_STRUCT ==2)
 		gridOptimiser =new GridListsOfListsOptimiser(POINTS_TOTAL,GRID_SIDE,CELL_SIZE,GRID_OFFSET);        
@@ -736,6 +1045,9 @@ public:
 		gridOptimiser =new OptimiserThreadPoolListsOfLists(POINTS_TOTAL,GRID_SIDE,CELL_SIZE,GRID_OFFSET,1);	
 #elif (OPTIM_STRUCT ==5)
 		gridOptimiser = new ArraysFromListsThreadPoolOptimiser(POINTS_TOTAL, GRID_SIDE, CELL_SIZE, GRID_OFFSET, 1);
+#elif (OPTIM_STRUCT ==6)
+		gridOptimiser = new ArraysFromListsAllIndsPerCellThreadPoolOptimiser(POINTS_TOTAL, GRID_SIDE, CELL_SIZE, GRID_OFFSET, 1);
+		
 #endif
 
 		int i, j, k;
@@ -872,7 +1184,7 @@ public:
 		delete[] initial_colors;
 		delete[] initial_density_pressure;
 
-#if(OPTIM_STRUCT ==4||OPTIM_STRUCT ==5)
+#if(OPTIM_STRUCT ==4||OPTIM_STRUCT ==5||OPTIM_STRUCT ==6)
 		glGenBuffers(2, m_grdBufferChunks_vbo);
 		glGenTextures(2, m_GRIDLIST_tbo);
 		pointsBuffer[0] = (vmath::vec3 *)glMapNamedBufferRange(m_vbo[POSITION_A], 0, POSITIONS_SIZE, GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT);
@@ -1347,7 +1659,7 @@ public:
 
 			std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 
-#if(OPTIM_STRUCT==4||OPTIM_STRUCT==5)
+#if(OPTIM_STRUCT==4||OPTIM_STRUCT==5||OPTIM_STRUCT==6)
 			//glFinish();		
 
 			//m_iteration_index+=CHUNK_COUNT/2 ;//5;
@@ -1388,10 +1700,11 @@ public:
 			std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
 			optTime = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count() / 1000.0;//OptimJoin
 
-			glActiveTexture(GL_TEXTURE1);
-			glBindTexture(GL_TEXTURE_BUFFER, m_vel_tbo[m_iteration_index & 1]);
+			
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_BUFFER, m_pos_tbo[m_iteration_index & 1]);
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_BUFFER, m_vel_tbo[m_iteration_index & 1]);
 			glActiveTexture(GL_TEXTURE2);
 			glBindTexture(GL_TEXTURE_BUFFER, m_GRIDLIST_tbo[m_iteration_index & 1]);
 			glActiveTexture(GL_TEXTURE3);

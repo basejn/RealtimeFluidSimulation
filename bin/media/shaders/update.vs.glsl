@@ -44,7 +44,7 @@ uniform float sigma=1.0;
 uniform float surfTensTresh=0.02;//0.20;
 uniform float deltaT=0.050;
 const float h=1.5;
-#define OPTIM_STRUCT  1//0=no 1=array 2=lists
+#define OPTIM_STRUCT  3//0=no 1=array 2=lists 3=arrayAllNeighboursInCell
 const float GRID_VOLUME_SIDE=10;
 const int gridSide=15;
 const float cellSize=2*GRID_VOLUME_SIDE/gridSide;//GRID_VOLUME_SIDE/gridSide
@@ -147,11 +147,11 @@ float laplacian_W_poly6(float r){
 	}
 	
 	
-	 void forEveryParticle(int i){
-	vec3 npos = texelFetch(tex_position,i).xyz;			
-			vec3 dstV =npos-position;			
-			float dst = length(dstV);
-			if(dst<=h){
+	void forEveryParticle(int i){
+		vec3 npos = texelFetch(tex_position,i).xyz;			
+		vec3 dstV =npos-position;			
+		float dst = length(dstV);
+		if(dst<=h){
 			dstV/=dst;
 			if((dst)<0.001){return;	dstV=vec3(1,1,1);dst=1;}
 			vec2 n_density_pressure = texelFetch(tex_density,i).xy;
@@ -166,13 +166,13 @@ float laplacian_W_poly6(float r){
 			//color_field_gradient+=n_velocity_mass.w/n_density_pressure.x*vec3(gradient_W_poly6(dstV.x),gradient_W_poly6(dstV.y),gradient_W_poly6(dstV.z));
 			//color_field_laplacian+=n_velocity_mass.w/n_density_pressure.x*laplacian_W_poly6(dst)*dstV;
 			color_field_laplacian+=n_velocity_mass.w/n_density_pressure.x*laplacian_W_poly6(dst);
-			}			
+		}			
 	}
 	void forEveryWall(vec4 plane){
-			vec3 dstV =-plane.xyz;						
-			float dst = (dot(position.xyz,plane.xyz)+plane.w);	
-			float hWall = h;
-			if(abs(dst)<=hWall){			
+		vec3 dstV =-plane.xyz;						
+		float dst = (dot(position.xyz,plane.xyz)+plane.w);	
+		float hWall = h;
+		if(abs(dst)<=hWall){			
 			//if(abs(dst)<0.001){return;	dstV=vec3(1,1,1);dst=1;}
 			vec2 n_density_pressure =wall_density_preassure;
 			vec4 n_velocity_mass = vec4(0,0,0,wall_mass);
@@ -187,7 +187,7 @@ float laplacian_W_poly6(float r){
 			//color_field_laplacian+=n_velocity_mass.w/n_density_pressure.x*laplacian_W_poly6(dst)*dstV;
 		//	color_field_laplacian+=-n_velocity_mass.w/n_density_pressure.x*laplacian_W_poly6(dst);
 			
-			}
+		}
 			
 	}
 	void forEverySphere(vec4 sphere){
@@ -239,51 +239,39 @@ float laplacian_W_poly6(float r){
 	*/
 	
 	void doForCellIndexLists(int myCell){	
-	int curInd = myCell*2;
-	int counts = texelFetch(tex_gridlist,curInd+1).r;	
-	curInd = texelFetch(tex_gridlist,curInd).r;// mestim kym pyrwi element
-	while(curInd!=0){
-	int curParticleInd = texelFetch(tex_gridlist,curInd).r;
-	if(curParticleInd!=gl_VertexID)forEveryParticle(curParticleInd);
-	curInd = texelFetch(tex_gridlist,curInd+1).r;// mestim kym sledwashtiq element
-	}
+		int curInd = myCell*2;
+		int counts = texelFetch(tex_gridlist,curInd+1).r;	
+		curInd = texelFetch(tex_gridlist,curInd).r;// mestim kym pyrwi element
+		while(curInd!=0){
+			int curParticleInd = texelFetch(tex_gridlist,curInd).r;
+			if(curParticleInd!=gl_VertexID)
+				forEveryParticle(curParticleInd);
+			curInd = texelFetch(tex_gridlist,curInd+1).r;// mestim kym sledwashtiq element
+		}
 	}
 	
 	void doForCellIndexArrays(int myCell){	
-	int curInd = myCell*2;
-	int count = texelFetch(tex_gridlist,curInd+1).r;	
-	curInd = texelFetch(tex_gridlist,curInd).r;// mestim kym pyrwi element
-	while(count-- >0){	
-	int curParticleInd = texelFetch(tex_gridlist,curInd).r;	
-	if(curParticleInd!=gl_VertexID)forEveryParticle(curParticleInd);
-	curInd++;
-	}
+		int curInd = myCell*2;
+		int count = texelFetch(tex_gridlist,curInd+1).r;	
+		curInd = texelFetch(tex_gridlist,curInd).r;// mestim kym pyrwi element
+		while(count-- >0){	
+			int curParticleInd = texelFetch(tex_gridlist,curInd).r;	
+			if(curParticleInd!=gl_VertexID)
+				forEveryParticle(curParticleInd);
+			curInd++;
+		}
 	}
 void main(void)
 {
-  //   p = position.xyz;    // p can be our position
-//	 m = velocity_mass.w;     // m is the mass of our vertex
- //    v = velocity_mass.xyz;             // u is the initial velocity
-	
-	//v.y-=gravity;
-	/*
-	if(all(lessThan(position , vec3(-8,-8,-8))))
-	{
-		tf_velocity_mass=vec4(wind_dir*4,1);
-		tf_position=vec3(9,9,9) - vec3(gl_VertexID*0.00001);		
-		tf_density_pressure = vec2(0,1); 
-		return;
-	}
-	//*/
-
  #if (OPTIM_STRUCT>0)
     int centerCellIndex = CellIndex(position); 
  
-    #if (OPTIM_STRUCT==1)
+    #if ((OPTIM_STRUCT==1)||(OPTIM_STRUCT==3))
 	doForCellIndexArrays(centerCellIndex);		
 	#elif  (OPTIM_STRUCT==2) 
 	doForCellIndexLists(centerCellIndex);	
 	#endif 	
+	#if ((OPTIM_STRUCT==1)||(OPTIM_STRUCT==2))
 	const vec3[26] offsets=vec3[26](vec3(cellSize,cellSize,0),  vec3(cellSize,cellSize,cellSize),   vec3(cellSize,cellSize,-cellSize),
 									vec3(cellSize,0,0), 		vec3(cellSize,0,cellSize),  	    vec3(cellSize,0,-cellSize),
 									vec3(cellSize,-cellSize,0), vec3(cellSize,-cellSize,cellSize),  vec3(cellSize,-cellSize,-cellSize),
@@ -305,8 +293,8 @@ void main(void)
 		#endif
 		}
 	}	
- 
- #else 
+	#endif
+  #else 
 	int imax = textureSize(tex_position);
 	for(int i=0;i<imax;i++){
 		if(i!=gl_VertexID)
@@ -314,7 +302,7 @@ void main(void)
 		forEveryParticle(i);
 		}
 	}	
-	#endif 
+  #endif 
 	
 	//*
 	forEveryWall(vec4(0,1,0,-glass_pos.y+GRID_VOLUME_SIDE*wall_hard_bounce));
