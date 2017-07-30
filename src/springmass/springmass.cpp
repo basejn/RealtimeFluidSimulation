@@ -762,16 +762,16 @@ private:
 			{
 				if ((*my_fillListTaskLock) == true)
 				{
-					fillListTask();
+					fillListTask(); // only one thread does this initialization job . 
 				}
 			}
 
-			GridListKernelParall(id, parameters[id].firstPoint, parameters[id].nPoints);
+			GridListKernelParall(id, parameters[id].firstPoint, parameters[id].nPoints); /// every thread doeas its own part of this job
 			(*my_gridListKernelParallLock).store(true);
 
-			if ((*my_fillListTaskLock) == true)
+			if ((*my_fillListTaskLock) == true) // only one thread does this job after all are finished with GridListKernelParall job
 			{
-				for (int i = 0; i < nThreads; i++)while (gridListKernelParall_Locs[i].load() == false);
+				for (int i = 0; i < nThreads; i++)while (gridListKernelParall_Locs[i].load() == false);// wait other threads to finish
 				gridArraysAllIndsPerCellFromListKernel();
 				optTime = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - t1).count() / 1000000.0);
 				(*my_fillListTaskLock) = (false);
@@ -901,15 +901,15 @@ private:
 		return inds;
 	}
 	void gridArraysAllIndsPerCellFromListKernel()
-	{	
-		
+	{			
 		int lastUsedIndex = gridSize * 2;
 		for (int curInd = 0; curInd < gridSize; curInd++)
 		{
 			//calculate new array size : sum of all neighbouring cells sizes
 			auto neighbours = &neighbourIndCache[curInd];// genNeighbourInds(curInd);			
+			//auto neighbours1 = genNeighbourInds(curInd); auto neighbours = &neighbours1;
 			
-			int curCelSize = 0;
+			int curCelSize = 0;			
 			for (auto neighbourCellInd : *neighbours)
 			{				
 				curCelSize += gridBuffer[neighbourCellInd * 2 + 1];
@@ -933,10 +933,9 @@ private:
 					curentIteratingIndex = gridBuffer[curentIteratingIndex + 1];
 				}
 			}
+			//std::sort(outGridBuffer + outGridBuffer[curInd * 2], outGridBuffer + outGridBuffer[curInd * 2] + outGridBuffer[curInd * 2 + 1],[](const int & a, const int & b) -> bool{return a < b;});
 		}
 	}
-
-	
 
 	void fillListTask()
 	{
@@ -1024,7 +1023,7 @@ public:
 		wind_speed = 1.80f;
 		wind_dir = vmath::vec3(0.0f, -1.0f, 0.0f);
 		glass_pos = vmath::vec3(0.0f, 0.0f, 0.0f);
-		sphere1 = vmath::vec4(0.0f, 10.0f, 0.0f, 2);
+		sphere1 = vmath::vec4(0.0f, 2.0f, 0.0f, 2);
 		sphere1_CurentInterpol = vmath::vec4(sphere1);
 		sphere1_speed = vmath::vec3(0.0f, 0.0f, 0.0f);
 		light_pos = vmath::vec3(10.0f, 40.0f, 30.0f);

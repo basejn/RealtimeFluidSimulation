@@ -151,9 +151,10 @@ float laplacian_W_poly6(float r){
 		vec3 npos = texelFetch(tex_position,i).xyz;			
 		vec3 dstV =npos-position;			
 		float dst = length(dstV);
-		if(dst<=h){
-			dstV/=dst;
+		if(dst<=h)
+		{
 			if((dst)<0.001){return;	dstV=vec3(1,1,1);dst=1;}
+			dstV/=dst;			
 			vec2 n_density_pressure = texelFetch(tex_density,i).xy;
 			vec4 n_velocity_mass = texelFetch(tex_velocity,i);
 			new_density_pressure.x+=n_velocity_mass.w*W_poly6(dst);
@@ -188,12 +189,11 @@ float laplacian_W_poly6(float r){
 		//	color_field_laplacian+=-n_velocity_mass.w/n_density_pressure.x*laplacian_W_poly6(dst);
 			
 		}
-			
 	}
 	void forEverySphere(vec4 sphere){
-			vec3 dstV =  sphere.xyz - position.xyz;						
-			float dst = abs(length(dstV)-sphere.w);			
-			if((dst)<=h){	
+		vec3 dstV =  sphere.xyz - position.xyz;						
+		float dst = abs(length(dstV)-sphere.w);			
+		if((dst)<=h){	
 			dstV/=dst;		
 			//if(abs(dst)<0.001){return;	dstV=vec3(1,1,1);dst=1;}
 			vec2 n_density_pressure =wall_density_preassure;
@@ -210,9 +210,7 @@ float laplacian_W_poly6(float r){
 			//color_field_laplacian+=n_velocity_mass.w/n_density_pressure.x*laplacian_W_poly6(dst)*dstV;
 		//	color_field_laplacian+=-n_velocity_mass.w/n_density_pressure.x*laplacian_W_poly6(dst);
 			
-			}
-			
-			
+		}
 	}
 
 	/* void forEveryParticleNaive(int i){
@@ -244,8 +242,8 @@ float laplacian_W_poly6(float r){
 		curInd = texelFetch(tex_gridlist,curInd).r;// mestim kym pyrwi element
 		while(curInd!=0){
 			int curParticleInd = texelFetch(tex_gridlist,curInd).r;
-			if(curParticleInd!=gl_VertexID)
-				forEveryParticle(curParticleInd);
+			//if(curParticleInd!=gl_VertexID)
+			forEveryParticle(curParticleInd);
 			curInd = texelFetch(tex_gridlist,curInd+1).r;// mestim kym sledwashtiq element
 		}
 	}
@@ -254,18 +252,17 @@ float laplacian_W_poly6(float r){
 		int curInd = myCell*2;
 		int count = texelFetch(tex_gridlist,curInd+1).r;	
 		curInd = texelFetch(tex_gridlist,curInd).r;// mestim kym pyrwi element
-		while(count-- >0){	
+		while(count-- >0 ){	
 			int curParticleInd = texelFetch(tex_gridlist,curInd).r;	
-			if(curParticleInd!=gl_VertexID)
-				forEveryParticle(curParticleInd);
+			//if(curParticleInd!=gl_VertexID)
+			forEveryParticle(curParticleInd);
 			curInd++;
 		}
 	}
 void main(void)
 {
  #if (OPTIM_STRUCT>0)
-    int centerCellIndex = CellIndex(position); 
- 
+    int centerCellIndex = CellIndex(position);  
     #if ((OPTIM_STRUCT==1)||(OPTIM_STRUCT==3))
 	doForCellIndexArrays(centerCellIndex);		
 	#elif  (OPTIM_STRUCT==2) 

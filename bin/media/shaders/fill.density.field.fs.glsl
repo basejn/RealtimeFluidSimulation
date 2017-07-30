@@ -7,7 +7,7 @@ layout (binding = 0) uniform samplerBuffer tex_position;
 layout (binding = 2) uniform isamplerBuffer tex_gridlist;
 
 
-#define OPTIM_STRUCT  1//0=no 1=array 2=lists
+#define OPTIM_STRUCT  3//0=no 1=array 2=lists 3=arrayAllNeighboursInCell
 const float GRID_VOLUME_SIDE=10;
 const int gridSide=15;
 const float cellSize=2*GRID_VOLUME_SIDE/gridSide;//GRID_VOLUME_SIDE/gridSide
@@ -64,27 +64,29 @@ float W_poly6(float r){
 	}
 	
 	
-	void doForCellIndexArrays(int myCell){	
-	int curInd = myCell*2;
-	int count = texelFetch(tex_gridlist,curInd+1).r;	
-	curInd = texelFetch(tex_gridlist,curInd).r;// mestim kym pyrwi element
-		while(count-- >0){	
-		int curParticleInd = texelFetch(tex_gridlist,curInd).r;	
-		forEveryParticle(curParticleInd);
-		curInd++;
-		}
-	}
+
 	
 	void doForCellIndexLists(int myCell){	
-	int curInd = myCell*2;
-	int counts = texelFetch(tex_gridlist,curInd+1).r;	
-	curInd = texelFetch(tex_gridlist,curInd).r;// mestim kym pyrwi element
+		int curInd = myCell*2;
+		int counts = texelFetch(tex_gridlist,curInd+1).r;	
+		curInd = texelFetch(tex_gridlist,curInd).r;// mestim kym pyrwi element
 		while(curInd!=0){
-		int curParticleInd = texelFetch(tex_gridlist,curInd).r;
-		forEveryParticle(curParticleInd);
-		curInd = texelFetch(tex_gridlist,curInd+1).r;// mestim kym sledwashtiq element
+			int curParticleInd = texelFetch(tex_gridlist,curInd).r;
+			forEveryParticle(curParticleInd);
+			curInd = texelFetch(tex_gridlist,curInd+1).r;// mestim kym sledwashtiq element
 		}
 	}	
+	
+	void doForCellIndexArrays(int myCell){	
+		int curInd = myCell*2;
+		int count = texelFetch(tex_gridlist,curInd+1).r;	
+		curInd = texelFetch(tex_gridlist,curInd).r;// mestim kym pyrwi element
+		while(count-- >0){	
+			int curParticleInd = texelFetch(tex_gridlist,curInd).r;	
+			forEveryParticle(curParticleInd);
+			curInd++;
+		}
+	}
 
 		
 	float preasureInPoint(vec3 point){	
@@ -93,11 +95,12 @@ float W_poly6(float r){
  #if (OPTIM_STRUCT>0)
 	int centerCellIndex = CellIndexNeighbour(curPos);  
 	if(!((centerCellIndex>=0)&&(centerCellIndex<gridSize)))return 0;
-	 #if (OPTIM_STRUCT==1)
+	#if ((OPTIM_STRUCT==1)||(OPTIM_STRUCT==3))
 	doForCellIndexArrays(centerCellIndex);		
 	#elif  (OPTIM_STRUCT==2) 
 	doForCellIndexLists(centerCellIndex);	
-	#endif 			
+	#endif 	
+	#if ((OPTIM_STRUCT==1)||(OPTIM_STRUCT==2))	
 	const vec3[26] offsets=vec3[26](vec3(cellSize,cellSize,0),  vec3(cellSize,cellSize,cellSize),   vec3(cellSize,cellSize,-cellSize),
 									vec3(cellSize,0,0), 		vec3(cellSize,0,cellSize),  	    vec3(cellSize,0,-cellSize),
 									vec3(cellSize,-cellSize,0), vec3(cellSize,-cellSize,cellSize),  vec3(cellSize,-cellSize,-cellSize),
@@ -119,7 +122,7 @@ float W_poly6(float r){
 		#endif	
 		}
 	}	
-	
+	#endif	
 	#else 
 	int imax = textureSize(tex_position);
 	for(int i=0;i<imax;i++){
