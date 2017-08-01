@@ -45,7 +45,7 @@ uniform float sigma=1.0;
 uniform float surfTensTresh=0.02;//0.20;
 uniform float deltaT=0.050;
 const float h=1.5;
-#define OPTIM_STRUCT  3//0=no 1=array 2=lists 3=arrayAllNeighboursInCell
+#define OPTIM_STRUCT  4//0=no 1=array 2=lists 3=arrayAllNeighboursInCell 4=arrayAllNeighbourDataInCell
 const float GRID_VOLUME_SIDE=10;
 const int gridSide=15;
 const float cellSize=2*GRID_VOLUME_SIDE/gridSide;//GRID_VOLUME_SIDE/gridSide
@@ -145,31 +145,8 @@ float laplacian_W_poly6(float r){
 		cellIndex +=(int(floor(point.y))*gridSide);
 		cellIndex +=(int(floor(point.x)));			
 		return cellIndex;	
-	}
+	}	
 	
-	
-	void forEveryParticle(int i){
-		vec3 npos = texelFetch(tex_position,i).xyz;			
-		vec3 dstV =npos-position;			
-		float dst = length(dstV);
-		if(dst<=h)
-		{
-			if((dst)<0.001){return;	dstV=vec3(1,1,1);dst=1;}
-			dstV/=dst;			
-			vec2 n_density_pressure = texelFetch(tex_density,i).xy;
-			vec4 n_velocity_mass = texelFetch(tex_velocity,i);
-			new_density_pressure.x+=n_velocity_mass.w*W_poly6(dst);
-			pressureF +=n_velocity_mass.w*(density_pressure.y+n_density_pressure.y)/(2*n_density_pressure.x)*gradient_W_spiky(dst)*dstV;
-			
-			//pressureF +=density_pressure.x *n_velocity_mass.w*(density_pressure.y/(density_pressure.x*density_pressure.x)+n_density_pressure.y/(n_density_pressure.x*n_density_pressure.x))*gradient_W_spiky(dst)*dstV;
-				
-			viscosityF+=eta*n_velocity_mass.w*((n_velocity_mass.xyz-velocity_mass.xyz))/n_density_pressure.x*laplacian_W_viscosity(dst);
-			color_field_gradient+=n_velocity_mass.w/n_density_pressure.x*gradient_W_poly6(dst)*dstV;
-			//color_field_gradient+=n_velocity_mass.w/n_density_pressure.x*vec3(gradient_W_poly6(dstV.x),gradient_W_poly6(dstV.y),gradient_W_poly6(dstV.z));
-			//color_field_laplacian+=n_velocity_mass.w/n_density_pressure.x*laplacian_W_poly6(dst)*dstV;
-			color_field_laplacian+=n_velocity_mass.w/n_density_pressure.x*laplacian_W_poly6(dst);
-		}			
-	}
 	void forEveryWall(vec4 plane){
 		vec3 dstV =-plane.xyz;						
 		float dst = (dot(position.xyz,plane.xyz)+plane.w);	
@@ -237,6 +214,43 @@ float laplacian_W_poly6(float r){
 	}
 	*/
 	
+	
+#if OPTIM_STRUCT <4
+	void forEveryParticle(int i){
+		vec3 npos = texelFetch(tex_position,i).xyz;			
+		vec3 dstV =npos-position;			
+		float dst = length(dstV);
+		if(dst<=h)
+		{
+			if((dst)<0.001){return;	dstV=vec3(1,1,1);dst=1;}
+			dstV/=dst;			
+			vec2 n_density_pressure = texelFetch(tex_density,i).xy;
+			vec4 n_velocity_mass = texelFetch(tex_velocity,i);
+			
+			new_density_pressure.x+=n_velocity_mass.w*W_poly6(dst);
+			pressureF +=n_velocity_mass.w*(density_pressure.y+n_density_pressure.y)/(2*n_density_pressure.x)*gradient_W_spiky(dst)*dstV;
+			
+			//pressureF +=density_pressure.x *n_velocity_mass.w*(density_pressure.y/(density_pressure.x*density_pressure.x)+n_density_pressure.y/(n_density_pressure.x*n_density_pressure.x))*gradient_W_spiky(dst)*dstV;
+				
+			viscosityF+=eta*n_velocity_mass.w*((n_velocity_mass.xyz-velocity_mass.xyz))/n_density_pressure.x*laplacian_W_viscosity(dst);
+			color_field_gradient+=n_velocity_mass.w/n_density_pressure.x*gradient_W_poly6(dst)*dstV;
+			//color_field_gradient+=n_velocity_mass.w/n_density_pressure.x*vec3(gradient_W_poly6(dstV.x),gradient_W_poly6(dstV.y),gradient_W_poly6(dstV.z));
+			//color_field_laplacian+=n_velocity_mass.w/n_density_pressure.x*laplacian_W_poly6(dst)*dstV;
+			color_field_laplacian+=n_velocity_mass.w/n_density_pressure.x*laplacian_W_poly6(dst);
+		}			
+	}
+	void doForCellIndexArrays(int myCell){	
+		int curInd = myCell*2;
+		int count = texelFetch(tex_gridlist,curInd+1).r;	
+		curInd = texelFetch(tex_gridlist,curInd).r;// mestim kym pyrwi element
+		while(count-- >0 ){	
+			int curParticleInd = texelFetch(tex_gridlist,curInd).r;	
+			//if(curParticleInd!=gl_VertexID)
+			forEveryParticle(curParticleInd);
+			curInd++;
+		}
+	}	
+
 	void doForCellIndexLists(int myCell){	
 		int curInd = myCell*2;
 		int counts = texelFetch(tex_gridlist,curInd+1).r;	
@@ -248,23 +262,47 @@ float laplacian_W_poly6(float r){
 			curInd = texelFetch(tex_gridlist,curInd+1).r;// mestim kym sledwashtiq element
 		}
 	}
-	
+#elif OPTIM_STRUCT==4
+	void forEveryParticle(int i){
+		vec3 npos = vec3(texelFetch(tex_griddata,i).x , texelFetch(tex_griddata,i+1).x , texelFetch(tex_griddata,i+2).x);
+		vec3 dstV =npos-position;			
+		float dst = length(dstV);
+		if(dst<=h)
+		{
+			if((dst)<0.001){return;	dstV=vec3(1,1,1);dst=1;}
+			dstV/=dst;			
+			
+			vec4 n_velocity_mass =vec4(texelFetch(tex_griddata,i+3).x , texelFetch(tex_griddata,i+4).x , texelFetch(tex_griddata,i+5).x, texelFetch(tex_griddata,i+6).x);
+			vec2 n_density_pressure =vec2(texelFetch(tex_griddata,i+7).x , texelFetch(tex_griddata,i+8).x);
+			
+			new_density_pressure.x+=n_velocity_mass.w*W_poly6(dst);
+			pressureF +=n_velocity_mass.w*(density_pressure.y+n_density_pressure.y)/(2*n_density_pressure.x)*gradient_W_spiky(dst)*dstV;
+			
+			//pressureF +=density_pressure.x *n_velocity_mass.w*(density_pressure.y/(density_pressure.x*density_pressure.x)+n_density_pressure.y/(n_density_pressure.x*n_density_pressure.x))*gradient_W_spiky(dst)*dstV;
+				
+			viscosityF+=eta*n_velocity_mass.w*((n_velocity_mass.xyz-velocity_mass.xyz))/n_density_pressure.x*laplacian_W_viscosity(dst);
+			color_field_gradient+=n_velocity_mass.w/n_density_pressure.x*gradient_W_poly6(dst)*dstV;
+			//color_field_gradient+=n_velocity_mass.w/n_density_pressure.x*vec3(gradient_W_poly6(dstV.x),gradient_W_poly6(dstV.y),gradient_W_poly6(dstV.z));
+			//color_field_laplacian+=n_velocity_mass.w/n_density_pressure.x*laplacian_W_poly6(dst)*dstV;
+			color_field_laplacian+=n_velocity_mass.w/n_density_pressure.x*laplacian_W_poly6(dst);
+		}			
+	}
 	void doForCellIndexArrays(int myCell){	
 		int curInd = myCell*2;
 		int count = texelFetch(tex_gridlist,curInd+1).r;	
 		curInd = texelFetch(tex_gridlist,curInd).r;// mestim kym pyrwi element
-		while(count-- >0 ){	
-			int curParticleInd = texelFetch(tex_gridlist,curInd).r;	
-			//if(curParticleInd!=gl_VertexID)
-			forEveryParticle(curParticleInd);
-			curInd++;
+		while(count-- >0 ){			
+			forEveryParticle(curInd);
+			curInd+=9;
 		}
-	}
+	}	
+#endif
+	
 void main(void)
 {
  #if (OPTIM_STRUCT>0)
     int centerCellIndex = CellIndex(position);  
-    #if ((OPTIM_STRUCT==1)||(OPTIM_STRUCT==3))
+    #if ((OPTIM_STRUCT==1)||(OPTIM_STRUCT==3)||(OPTIM_STRUCT==4))
 	doForCellIndexArrays(centerCellIndex);		
 	#elif  (OPTIM_STRUCT==2) 
 	doForCellIndexLists(centerCellIndex);	

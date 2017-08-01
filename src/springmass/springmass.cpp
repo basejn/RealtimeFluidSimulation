@@ -1002,7 +1002,7 @@ public:
 
 	std::chrono::high_resolution_clock::time_point t1;
 
-	void fillList(vmath::vec3* pointsBuffer, int* gridBuffer, vec4* velocityBuffer, vec2* density_pBuffer, vmath::vec3 offset_vec, float* gridDataBuffer)
+	void fillList(vmath::vec3* pointsBuffer, vec4* velocityBuffer, vec2* density_pBuffer, vmath::vec3 offset_vec, int* gridBuffer, float* gridDataBuffer)
 	{
 		t1 = std::chrono::high_resolution_clock::now();
 
@@ -1211,8 +1211,19 @@ private:
 				int curentIteratingIndex = gridBuffer[neighbourCellInd * 2];
 				while (curentIteratingIndex != 0)
 				{
-					outGridBuffer[curentParticlePosIndex++] = gridBuffer[curentIteratingIndex];// particle ind
+					int index= gridBuffer[curentIteratingIndex];// particle ind
 					curentIteratingIndex = gridBuffer[curentIteratingIndex + 1];//move to next (ind,next)pair
+					outGridDataBuffer[curentParticlePosIndex++] = this->pointsBuffer[index][0];
+					outGridDataBuffer[curentParticlePosIndex++] = this->pointsBuffer[index][1];
+					outGridDataBuffer[curentParticlePosIndex++] = this->pointsBuffer[index][2];
+
+					outGridDataBuffer[curentParticlePosIndex++] = this->velocityBuffer[index][0];// TODO memcpy probably faster
+					outGridDataBuffer[curentParticlePosIndex++] = this->velocityBuffer[index][1];
+					outGridDataBuffer[curentParticlePosIndex++] = this->velocityBuffer[index][2];
+					outGridDataBuffer[curentParticlePosIndex++] = this->velocityBuffer[index][4];
+
+					outGridDataBuffer[curentParticlePosIndex++] = this->density_pBuffer[index][0];
+					outGridDataBuffer[curentParticlePosIndex++] = this->density_pBuffer[index][1];
 				}
 			}
 
@@ -1434,12 +1445,14 @@ public:
 			glEnableVertexAttribArray(0);
 
 			glBindBuffer(GL_ARRAY_BUFFER, m_vbo[VELOCITY_A + i]);
-			glBufferData(GL_ARRAY_BUFFER, POINTS_TOTAL * sizeof(vmath::vec4), initial_velocities, GL_DYNAMIC_COPY);
+			glBufferStorage(GL_ARRAY_BUFFER, POINTS_TOTAL * sizeof(vmath::vec4), initial_velocities, GL_DYNAMIC_STORAGE_BIT | GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT);
+			//glBufferData(GL_ARRAY_BUFFER, POINTS_TOTAL * sizeof(vmath::vec4), initial_velocities, GL_DYNAMIC_STORAGE_BIT | GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT);
 			glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, NULL);
 			glEnableVertexAttribArray(1);
 
 			glBindBuffer(GL_ARRAY_BUFFER, m_vbo[DENSITY_A + i]);
-			glBufferData(GL_ARRAY_BUFFER, POINTS_TOTAL * sizeof(vmath::vec2), initial_density_pressure, GL_DYNAMIC_COPY);
+			glBufferStorage(GL_ARRAY_BUFFER, POINTS_TOTAL * sizeof(vmath::vec2), initial_density_pressure, GL_DYNAMIC_STORAGE_BIT | GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT);
+			//glBufferData(GL_ARRAY_BUFFER, POINTS_TOTAL * sizeof(vmath::vec2), initial_density_pressure, GL_DYNAMIC_STORAGE_BIT | GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT);
 			glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, NULL);
 			glEnableVertexAttribArray(2);
 
@@ -1519,7 +1532,7 @@ public:
 			float* gridDataBuffertmp = (float *)glMapNamedBufferRange(m_GridDataBufferChunks_vbo[i], 0, GRIDLIST_DATA_SIZE, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_FLUSH_EXPLICIT_BIT);
 
 
-			((ArraysFromListsAllDataPerCellThreadPoolOptimiser*)gridOptimiser)->fillList(pointsBuffer[i % 2], gridBuffertmp, glass_pos, gridDataBuffertmp);
+			((ArraysFromListsAllDataPerCellThreadPoolOptimiser*)gridOptimiser)->fillList(pointsBuffer[i % 2], velosityBuffer[i % 2], density_pBuffer[i % 2], glass_pos, gridBuffertmp, gridDataBuffertmp);
 			gridBuffer[i] = gridBuffertmp;
 			gridDataBuffer[i] = gridDataBuffertmp;
 
@@ -2005,8 +2018,8 @@ public:
 			//glFlushMappedNamedBufferRange(m_grdBufferChunks_vbo[((m_iteration_index)& 1)], 0, GRIDLIST_SIZE);
 
 #if OPTIM_STRUCT == 7
-			glFlushMappedNamedBufferRange(m_grdBufferChunks_vbo[((m_iteration_index)& 1)], 0, GRIDLIST_SIZE);
-			((ArraysFromListsAllDataPerCellThreadPoolOptimiser*)gridOptimiser)->fillList(pointsBuffer[(m_iteration_index)& 1], gridBuffer[(m_iteration_index + 1) & 1], glass_pos, gridDataBuffer[(m_iteration_index + 1) & 1]);
+			glFlushMappedNamedBufferRange(m_grdBufferChunks_vbo[((m_iteration_index)& 1)], 0, GRIDLIST_SIZE);			
+			((ArraysFromListsAllDataPerCellThreadPoolOptimiser*)gridOptimiser)->fillList(pointsBuffer[(m_iteration_index)& 1], velosityBuffer[(m_iteration_index)& 1], density_pBuffer[(m_iteration_index)& 1], glass_pos, gridBuffer[(m_iteration_index + 1) & 1], gridDataBuffer[(m_iteration_index + 1) & 1]);
 #else
 			gridOptimiser->fillList(pointsBuffer[(m_iteration_index)& 1], gridBuffer[(m_iteration_index + 1) & 1], glass_pos);
 #endif
