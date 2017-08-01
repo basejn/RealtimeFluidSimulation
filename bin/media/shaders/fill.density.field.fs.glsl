@@ -5,6 +5,7 @@ layout (location = 0) out float density;
 layout (binding = 0) uniform samplerBuffer tex_position;
 //layout (binding = 1) uniform samplerBuffer tex_velocity;
 layout (binding = 2) uniform isamplerBuffer tex_gridlist;
+layout (binding = 3) uniform samplerBuffer tex_griddata;
 
 
 #define OPTIM_STRUCT  3//0=no 1=array 2=lists 3=arrayAllNeighboursInCell

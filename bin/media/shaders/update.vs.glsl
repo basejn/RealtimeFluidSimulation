@@ -17,6 +17,7 @@ layout (binding = 0) uniform samplerBuffer tex_position;
 layout (binding = 1) uniform samplerBuffer tex_velocity;
 layout (binding = 2) uniform isamplerBuffer tex_gridlist;
 layout (binding = 3) uniform samplerBuffer tex_density;
+layout (binding = 4) uniform samplerBuffer tex_griddata;
 // The outputs of the vertex shader are the same as the inputs
 out vec3 tf_position;
 out vec4 tf_velocity_mass;

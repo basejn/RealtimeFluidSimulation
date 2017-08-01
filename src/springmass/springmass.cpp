@@ -62,7 +62,7 @@ enum
 };
 
 #define INT_STATE_FROM_FILE 1
-#define OPTIM_STRUCT  6 //0=no 1=array 2=lists 3=listsParral 4=listsParralThreadPool 5=listsParralThreadPoolArrays 6=arrayAllNeighboursInCell
+#define OPTIM_STRUCT  7 //0=no 1=array 2=lists 3=listsParral 4=listsParralThreadPool 5=listsParralThreadPoolArrays 6=arrayAllNeighbourIndsInCell 7=arrayAllNeighbourDataInCell
 
 const int GRID_SIDE =  15;
 const float GRID_VOLUME_SIDE = 20.0f; //+-10
@@ -73,7 +73,10 @@ const int CELL_COUNT = GRID_SIDE * GRID_SIDE * GRID_SIDE;
 #if (OPTIM_STRUCT ==1||OPTIM_STRUCT ==5)
 const int GRIDLIST_SIZE = (GRID_SIDE * GRID_SIDE * GRID_SIDE * 3 + POINTS_TOTAL) * sizeof(int);
 #elif (OPTIM_STRUCT ==6)
-const int GRIDLIST_SIZE = (GRID_SIDE * GRID_SIDE * GRID_SIDE * 3 * POINTS_TOTAL) * sizeof(int);
+const int GRIDLIST_SIZE = (GRID_SIDE * GRID_SIDE * GRID_SIDE * 3 * (27*POINTS_TOTAL  / (GRID_SIDE * GRID_SIDE * GRID_SIDE)) ) * sizeof(int);
+#elif (OPTIM_STRUCT ==7)
+const int GRIDLIST_SIZE = (GRID_SIDE * GRID_SIDE * GRID_SIDE * 2) * sizeof(int);
+const int GRIDLIST_DATA_SIZE = (GRID_SIDE * GRID_SIDE * GRID_SIDE * 9 * (27 * POINTS_TOTAL / (GRID_SIDE * GRID_SIDE * GRID_SIDE))) * sizeof(float);
 #else
 const int GRIDLIST_SIZE = (GRID_SIDE*GRID_SIDE*GRID_SIDE*2+POINTS_TOTAL*2) * sizeof(int);
 #endif
@@ -244,7 +247,7 @@ private:
 		return cellIndex;
 	}
 };
-//Last variant
+
 class GridListsOfListsParralOptimiser :public GridOptimiser
 {
 public:
@@ -550,7 +553,7 @@ private:
 		int nPoints;
 	}*parameters;
 };
-//Last Variant
+
 
 class OptimiserThreadPoolListsOfLists :public GridListsOfListsParralOptimiser
 {
@@ -900,32 +903,33 @@ private:
 
 		return inds;
 	}
+
 	void gridArraysAllIndsPerCellFromListKernel()
-	{			
+	{
 		int lastUsedIndex = gridSize * 2;
 		for (int curInd = 0; curInd < gridSize; curInd++)
 		{
 			//calculate new array size : sum of all neighbouring cells sizes
 			auto neighbours = &neighbourIndCache[curInd];// genNeighbourInds(curInd);			
 			//auto neighbours1 = genNeighbourInds(curInd); auto neighbours = &neighbours1;
-			
-			int curCelSize = 0;			
+
+			int curCelSize = 0;
 			for (auto neighbourCellInd : *neighbours)
-			{				
+			{
 				curCelSize += gridBuffer[neighbourCellInd * 2 + 1];
 			}
-			
+
 			//prepare new array
 			int curentParticlePosIndex = lastUsedIndex; //new array position
 			lastUsedIndex += curCelSize + 1;			//update new free memory position
 
-			outGridBuffer[curentParticlePosIndex + curCelSize+1] = 0;// null terminate last position of new array
+			outGridBuffer[curentParticlePosIndex + curCelSize + 1] = 0;// null terminate last position of new array
 			outGridBuffer[curInd * 2] = curentParticlePosIndex;//new array position
 			outGridBuffer[curInd * 2 + 1] = curCelSize;//size of new array
-			
+
 			//fill indices from neighbours
 			for (auto neighbourCellInd : *neighbours)
-			{				
+			{
 				int curentIteratingIndex = gridBuffer[neighbourCellInd * 2];
 				while (curentIteratingIndex != 0)
 				{
@@ -975,7 +979,288 @@ private:
 		int nPoints;
 	}*parameters;
 };
-//Last Variant
+//Last Variant 
+class ArraysFromListsAllDataPerCellThreadPoolOptimiser :public GridListsOfListsParralOptimiser
+{
+public:
+	ArraysFromListsAllDataPerCellThreadPoolOptimiser(int pointsCount, int gridSide, float cellSize, float offset, int nThreads) : GridListsOfListsParralOptimiser(pointsCount, gridSide, cellSize, offset, nThreads)
+	{
+		this->nThreads = nThreads;
+		worker_Locs = new std::atomic<bool>[nThreads];
+		fillListTask_Locs = new std::atomic<bool>[nThreads];
+		gridListKernelParall_Locs = new std::atomic<bool>[nThreads];
+		gridBuffer = new int[pointsCount * 2 + gridSize * 2];
+		resetWorkers();
+		resetfillListTasks();
+		parameters = new params[nThreads];
+		for (int i = 0; i < nThreads; i++)
+		{
+			threads.emplace_back(std::thread(&ArraysFromListsAllDataPerCellThreadPoolOptimiser::worker, this, i, &worker_Locs[i], &fillListTask_Locs[i], &gridListKernelParall_Locs[i]));
+		}
+		initNeighbourIndsCache();
+	}
+
+	std::chrono::high_resolution_clock::time_point t1;
+
+	void fillList(vmath::vec3* pointsBuffer, int* gridBuffer, vec4* velocityBuffer, vec2* density_pBuffer, vmath::vec3 offset_vec, float* gridDataBuffer)
+	{
+		t1 = std::chrono::high_resolution_clock::now();
+
+		this->pointsBuffer = pointsBuffer;		
+		this->outGridBuffer = gridBuffer;
+		this->outGridDataBuffer = gridDataBuffer;
+		this->velocityBuffer = velocityBuffer;
+		this->density_pBuffer = density_pBuffer;
+
+		this->offset_vec = offset_vec;
+		//fillListTask();
+		fillListTask_Locs[0] = (true);
+	}
+
+	void resetWorkers()
+	{
+		for (int i = 0; i < nThreads; i++)
+		{
+			worker_Locs[i].store(false);
+			gridListKernelParall_Locs[i].store(false);
+		}
+	}
+
+	void resetfillListTasks()
+	{
+		for (int i = 0; i < nThreads; i++)
+		{
+			fillListTask_Locs[i] = (false);
+		}
+	}
+
+	bool is_ready()
+	{
+		for (int i = 0; i < nThreads; i++)
+		{
+			if (worker_Locs[i].load() == true)return false;
+		}
+		return true;
+	}
+
+	void join_Workers()
+	{
+		//DBOUT("\n \t\t Joining");		
+		for (int i = 0; i < nThreads; i++)
+		{
+			while (fillListTask_Locs[i].load() == true);
+			while (worker_Locs[i].load() == true);
+		}
+	}
+
+private:
+	void printList(std::string fileName, int* gridBuffer)
+	{
+		std::ofstream myfile;
+		myfile.open(fileName);
+
+		for (int i = 0; i < (GRID_SIDE * GRID_SIDE * GRID_SIDE * 2 + POINTS_TOTAL * 2); i++)
+		{
+			myfile << "\n" << i << ":\t" << gridBuffer[i];
+		}
+		myfile.close();
+	}
+
+	void worker(int id, std::atomic<bool>* my_Lock, std::atomic<bool>* my_fillListTaskLock, std::atomic<bool>* my_gridListKernelParallLock)
+	{
+		while (true)
+		{
+			while ((*my_Lock).load() == false)
+			{
+				if ((*my_fillListTaskLock) == true)
+				{
+					fillListTask(); // only one thread does this initialization job . 
+				}
+			}
+
+			GridListKernelParall(id, parameters[id].firstPoint, parameters[id].nPoints); /// every thread doeas its own part of this job
+			(*my_gridListKernelParallLock).store(true);
+
+			if ((*my_fillListTaskLock) == true) // only one thread does this job after all are finished with GridListKernelParall job
+			{
+				for (int i = 0; i < nThreads; i++)while (gridListKernelParall_Locs[i].load() == false);// wait other threads to finish
+				gridArraysAllIndsPerCellFromListKernel();
+				optTime = (std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - t1).count() / 1000000.0);
+				(*my_fillListTaskLock) = (false);
+			}
+			(*my_Lock).store(false);
+		}
+	}
+	void initNeighbourIndsCache()
+	{
+		for (int i = 0; i < GRID_SIDE*GRID_SIDE*GRID_SIDE; i++){
+			neighbourIndCache[i] = genNeighbourInds(i);
+		}
+	}
+	static std::vector<int> genNeighbourIndsOld(int i, const int GRID_SIDE = GRID_SIDE)
+	{
+		std::vector<int> inds{};
+		//for (int i = 0; i < GRID_SIDE*GRID_SIDE*GRID_SIDE; i++)inds.push_back(i);
+		//return inds;
+
+		int indss[3 * 3 * 3];
+		int ii = 0;
+		indss[ii++] = i;
+		indss[ii++] = i + GRID_SIDE;
+		indss[ii++] = i - GRID_SIDE;
+		indss[ii++] = i + 1;
+		indss[ii++] = i - 1;
+		indss[ii++] = i + GRID_SIDE + 1;
+		indss[ii++] = i - (GRID_SIDE + 1);
+		indss[ii++] = i + GRID_SIDE - 1;
+		indss[ii++] = i - (GRID_SIDE - 1);
+		i += GRID_SIDE*GRID_SIDE;
+		indss[ii++] = i;
+		indss[ii++] = i + GRID_SIDE;
+		indss[ii++] = i - GRID_SIDE;
+		indss[ii++] = i + 1;
+		indss[ii++] = i - 1;
+		indss[ii++] = i + GRID_SIDE + 1;
+		indss[ii++] = i - (GRID_SIDE + 1);
+		indss[ii++] = i + GRID_SIDE - 1;
+		indss[ii++] = i - (GRID_SIDE - 1);
+		i -= 2 * GRID_SIDE*GRID_SIDE;
+		indss[ii++] = i;
+		indss[ii++] = i + GRID_SIDE;
+		indss[ii++] = i - GRID_SIDE;
+		indss[ii++] = i + 1;
+		indss[ii++] = i - 1;
+		indss[ii++] = i + GRID_SIDE + 1;
+		indss[ii++] = i - (GRID_SIDE + 1);
+		indss[ii++] = i + GRID_SIDE - 1;
+		indss[ii++] = i - (GRID_SIDE - 1);
+
+		for (int i = 0; i < 3 * 3 * 3; i++)
+		{
+			if (indss[i] >= 0 && indss[i]<GRID_SIDE*GRID_SIDE*GRID_SIDE)
+				inds.push_back(indss[i]);
+		}
+
+		return inds;
+	}
+	inline static  int pointToIndex(ivec3* point)
+	{
+		int cellIndex = 0;
+		cellIndex = std::max(std::min(((((*point)[2]))) * GRID_SIDE * GRID_SIDE, GRID_SIDE * GRID_SIDE * (GRID_SIDE - 1)), 0);
+		cellIndex += std::max(std::min(((((*point)[1]))) * GRID_SIDE, GRID_SIDE * (GRID_SIDE - 1)), 0);
+		cellIndex += std::max(std::min(((((*point)[0]))), (GRID_SIDE - 1)), 0);
+		return cellIndex;
+	}
+	static ivec3 indexToPoint(int i, const int GRID_SIDE = GRID_SIDE)
+	{
+		int x, y, z;
+		x = i % GRID_SIDE;
+		y = (i / GRID_SIDE) % (GRID_SIDE);
+		z = (i / (GRID_SIDE * GRID_SIDE)) % (GRID_SIDE);
+		return ivec3(x, y, z);
+	}
+	std::vector<int> genNeighbourInds(int i)
+	{
+		std::vector<int> inds{};
+
+		auto point = indexToPoint(i);
+
+		
+
+		int seta[GRID_SIDE*GRID_SIDE*GRID_SIDE]{0};
+		for (size_t j = 0; j < 27; j++)// all neigbouring points
+		{
+			seta[pointToIndex(new ivec3(point + ivec3(-1, -1, -1) + indexToPoint(j, 3)))] = 1;
+		}
+	
+		for (int i = 0; i < GRID_SIDE*GRID_SIDE*GRID_SIDE; i++)
+		{
+			if (seta[i])
+				inds.push_back(i);
+		}
+
+		return inds;
+	}
+	void gridArraysAllIndsPerCellFromListKernel()
+	{
+		int lastUsedIndex = 0;
+		for (int curInd = 0; curInd < gridSize; curInd++)
+		{
+			//calculate new array size : sum of all neighbouring cells sizes
+			auto neighbours = &neighbourIndCache[curInd];// genNeighbourInds(curInd);			
+			//auto neighbours1 = genNeighbourInds(curInd); auto neighbours = &neighbours1;
+
+			int curCelSize = 0;
+			for (auto neighbourCellInd : *neighbours)
+			{
+				curCelSize += gridBuffer[neighbourCellInd * 2 + 1];
+			}
+			curCelSize;
+
+			//prepare new array
+			int curentParticlePosIndex = lastUsedIndex; //new array position
+			lastUsedIndex += curCelSize + 1;			//update new free memory position
+
+
+			outGridBuffer[curInd * 2] = curentParticlePosIndex;//new array position
+			outGridBuffer[curInd * 2 + 1] = curCelSize;//size of new array
+
+			//fill indices from neighbours
+			for (auto neighbourCellInd : *neighbours)
+			{
+				int curentIteratingIndex = gridBuffer[neighbourCellInd * 2];
+				while (curentIteratingIndex != 0)
+				{
+					outGridBuffer[curentParticlePosIndex++] = gridBuffer[curentIteratingIndex];// particle ind
+					curentIteratingIndex = gridBuffer[curentIteratingIndex + 1];//move to next (ind,next)pair
+				}
+			}
+
+		}
+	}
+
+	void fillListTask()
+	{
+		*lastUsedInd = (gridSize)-1;
+
+		//for(int i=0;i<gridSize*2;i++)gridBuffer[i]=0;//init buffer
+		memset(gridBuffer, 0, gridSize * 2 * sizeof(int));
+		int pointsPerKernel = pointsCount / (nThreads);
+		int pointsPerKernelRem = pointsCount % nThreads;
+
+		//DBOUT("\n");
+		//resetWorkers();
+		for (int i = 0; i < nThreads; i++)
+		{
+			int nPoints = pointsPerKernel;
+			if ((i) == (nThreads - 1))nPoints += pointsPerKernelRem;
+			//	v.emplace_back(std::thread(&GridListsOfListsParralOptimiser::GridListKernelParall,this,i,pointsPerKernel*i,nPoints));
+			//	GridListKernelParall(i,pointsPerKernel*i, nPoints);
+			parameters[i].firstPoint = pointsPerKernel * i;
+			parameters[i].nPoints = nPoints;
+			gridListKernelParall_Locs[i].store(false);
+			worker_Locs[i] = (true);
+		}
+	}
+
+	std::vector<int> neighbourIndCache[GRID_SIDE*GRID_SIDE*GRID_SIDE];
+	std::atomic<bool>* worker_Locs;
+	std::atomic<bool>* gridListKernelParall_Locs;
+	std::atomic<bool>* fillListTask_Locs;
+	int nThreads;
+	int* outGridBuffer;
+	float* outGridDataBuffer;
+	vec4* velocityBuffer;
+	vec2* density_pBuffer;
+	std::vector<std::thread> threads;
+
+	struct params
+	{
+		int firstPoint;
+		int nPoints;
+	}*parameters;
+};
+
 
 class springmass_app : public sb7::application
 {
@@ -1046,7 +1331,9 @@ public:
 		gridOptimiser = new ArraysFromListsThreadPoolOptimiser(POINTS_TOTAL, GRID_SIDE, CELL_SIZE, GRID_OFFSET, 1);
 #elif (OPTIM_STRUCT ==6)
 		gridOptimiser = new ArraysFromListsAllIndsPerCellThreadPoolOptimiser(POINTS_TOTAL, GRID_SIDE, CELL_SIZE, GRID_OFFSET, 1);
-		
+#elif (OPTIM_STRUCT ==7)
+		gridOptimiser = new ArraysFromListsAllDataPerCellThreadPoolOptimiser(POINTS_TOTAL, GRID_SIDE, CELL_SIZE, GRID_OFFSET, 1);
+
 #endif
 
 		int i, j, k;
@@ -1165,7 +1452,6 @@ public:
 			//glBufferData(GL_ARRAY_BUFFER, GRIDLIST_SIZE, NULL, GL_DYNAMIC_COPY);
 			glBufferStorage(GL_ARRAY_BUFFER, GRIDLIST_SIZE, NULL, GL_DYNAMIC_STORAGE_BIT|GL_MAP_WRITE_BIT|GL_MAP_PERSISTENT_BIT);
 
-
 			int * gridBuffertmp = (int *)glMapNamedBufferRange(m_vbo[GRIDLIST_A + i], 0, GRIDLIST_SIZE, GL_MAP_WRITE_BIT );
 			vmath::vec3 * pointsBuffertmp = (vmath::vec3 *)glMapNamedBufferRange( m_vbo[POSITION_A +i], 0, POSITIONS_SIZE, GL_MAP_READ_BIT);
 
@@ -1191,22 +1477,58 @@ public:
 		for (int i = 0; i < 2; i++)
 		{
 			fence[i] = 0;
-			glBindBuffer(GL_ARRAY_BUFFER, m_grdBufferChunks_vbo[i]);
-			//glBufferData(GL_ARRAY_BUFFER, GRIDLIST_SIZE, NULL, GL_DYNAMIC_COPY);
+			glBindBuffer(GL_ARRAY_BUFFER, m_grdBufferChunks_vbo[i]);			
 			glBufferStorage(GL_ARRAY_BUFFER, GRIDLIST_SIZE, NULL, GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
 
 			int* gridBuffertmp = (int *)glMapNamedBufferRange(m_grdBufferChunks_vbo[i], 0, GRIDLIST_SIZE, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_FLUSH_EXPLICIT_BIT);
 
 			gridOptimiser->fillList(pointsBuffer[i % 2], gridBuffertmp, glass_pos);
-			//gridOptimiser->printList(pointsBuffer,gridBuffer);std::exit(0); 
-
 			gridBuffer[i] = gridBuffertmp;
 
 			(gridOptimiser)->join_Workers();
-			//glFlushMappedNamedBufferRange(m_vbo[GRIDLIST_A + (i & 1)],0,GRIDLIST_SIZE);
+			
+			glBindTexture(GL_TEXTURE_BUFFER, m_GRIDLIST_tbo[i]);
+			glTexBuffer(GL_TEXTURE_BUFFER, GL_R32I, m_grdBufferChunks_vbo[i]);
+
+		}
+#elif OPTIM_STRUCT==7
+		glGenBuffers(2, m_grdBufferChunks_vbo);
+		glGenTextures(2, m_GRIDLIST_tbo);
+		glGenBuffers(2, m_GridDataBufferChunks_vbo);
+		glGenTextures(2, m_GRID_DATA_tbo);
+
+		pointsBuffer[0] = (vmath::vec3 *)glMapNamedBufferRange(m_vbo[POSITION_A], 0, POSITIONS_SIZE, GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT);
+		pointsBuffer[1] = (vmath::vec3 *)glMapNamedBufferRange(m_vbo[POSITION_A + 1], 0, POSITIONS_SIZE, GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT);
+
+		velosityBuffer[0] = (vmath::vec4 *)glMapNamedBufferRange(m_vbo[VELOCITY_A], 0, POINTS_TOTAL * sizeof(vmath::vec4), GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT);
+		velosityBuffer[1] = (vmath::vec4 *)glMapNamedBufferRange(m_vbo[VELOCITY_A + 1], 0, POINTS_TOTAL * sizeof(vmath::vec4), GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT);
+
+		density_pBuffer[0] = (vmath::vec2 *)glMapNamedBufferRange(m_vbo[DENSITY_A], 0, POINTS_TOTAL * sizeof(vmath::vec2), GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT);
+		density_pBuffer[1] = (vmath::vec2 *)glMapNamedBufferRange(m_vbo[DENSITY_A + 1], 0, POINTS_TOTAL * sizeof(vmath::vec2), GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT);
+
+		
+		for (int i = 0; i < 2; i++)
+		{
+			fence[i] = 0;
+			glBindBuffer(GL_ARRAY_BUFFER, m_grdBufferChunks_vbo[i]);
+			glBufferStorage(GL_ARRAY_BUFFER, GRIDLIST_SIZE, NULL, GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
+			int* gridBuffertmp = (int *)glMapNamedBufferRange(m_grdBufferChunks_vbo[i], 0, GRIDLIST_SIZE, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_FLUSH_EXPLICIT_BIT);
+
+			glBindBuffer(GL_ARRAY_BUFFER, m_GridDataBufferChunks_vbo[i]);
+			glBufferStorage(GL_ARRAY_BUFFER, GRIDLIST_DATA_SIZE, NULL, GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
+			float* gridDataBuffertmp = (float *)glMapNamedBufferRange(m_GridDataBufferChunks_vbo[i], 0, GRIDLIST_DATA_SIZE, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_FLUSH_EXPLICIT_BIT);
+
+
+			((ArraysFromListsAllDataPerCellThreadPoolOptimiser*)gridOptimiser)->fillList(pointsBuffer[i % 2], gridBuffertmp, glass_pos, gridDataBuffertmp);
+			gridBuffer[i] = gridBuffertmp;
+			gridDataBuffer[i] = gridDataBuffertmp;
+
+			gridOptimiser->join_Workers();
 
 			glBindTexture(GL_TEXTURE_BUFFER, m_GRIDLIST_tbo[i]);
 			glTexBuffer(GL_TEXTURE_BUFFER, GL_R32I, m_grdBufferChunks_vbo[i]);
+			glBindTexture(GL_TEXTURE_BUFFER, m_GRID_DATA_tbo[i]);
+			glTexBuffer(GL_TEXTURE_BUFFER, GL_R32F, m_GridDataBufferChunks_vbo[i]);
 		}
 #endif
 
@@ -1285,7 +1607,6 @@ public:
 		vectorPtr->_M_finish = vectorPtr->_M_end_of_storage = vectorPtr->_M_start + arraySize;
 		return targetVector;
 	}
-
 
 	void isAnyNanInf()
 	{
@@ -1572,15 +1893,12 @@ public:
 		glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 		glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_BORDER);
 
-
 		glGenFramebuffers(1, &density_Texture_FBO);
 		glBindFramebuffer(GL_FRAMEBUFFER, density_Texture_FBO);
-		glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-			density_Field_Texture, 0);
+		glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,density_Field_Texture, 0);
 		static const GLuint draw_buffers[] = { GL_COLOR_ATTACHMENT0 };
 		glDrawBuffers(1, draw_buffers);
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
 
 		glBindTexture(GL_TEXTURE_BUFFER, 0);
 		glBindTexture(GL_TEXTURE_3D, 0);
@@ -1599,6 +1917,10 @@ public:
 		glBindTexture(GL_TEXTURE_BUFFER, m_vel_tbo[m_iteration_index & 1]);
 		glActiveTexture(GL_TEXTURE2);
 		glBindTexture(GL_TEXTURE_BUFFER, m_GRIDLIST_tbo[m_iteration_index & 1]);
+#if OPTIM_STRUCT==7
+		glActiveTexture(GL_TEXTURE3);
+		glBindTexture(GL_TEXTURE_BUFFER, m_GRID_DATA_tbo[m_iteration_index & 1]);
+#endif
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glViewport(0, 0, info.windowWidth, info.windowHeight);
@@ -1649,6 +1971,12 @@ public:
 		{
 			m_iteration_index++;
 
+			if (requestRain > 0)
+			{
+				rain((m_iteration_index)& 1);
+				requestRain--;
+			}
+
 			vec4 tmp_sphere1_CurentInterpol = mix(sphere1_CurentInterpol, sphere1, 0.01);
 			vec3 tmp_sphere1_speed = *((vec3*)&tmp_sphere1_CurentInterpol) - (*((vec3*)&sphere1_CurentInterpol));
 			sphere1_CurentInterpol = tmp_sphere1_CurentInterpol;
@@ -1658,7 +1986,7 @@ public:
 
 			std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 
-#if(OPTIM_STRUCT==4||OPTIM_STRUCT==5||OPTIM_STRUCT==6)
+#if(OPTIM_STRUCT==4||OPTIM_STRUCT==5||OPTIM_STRUCT==6 || OPTIM_STRUCT==7)
 			//glFinish();		
 
 			//m_iteration_index+=CHUNK_COUNT/2 ;//5;
@@ -1669,23 +1997,20 @@ public:
 				stalling = isSignaled == GL_UNSIGNALED;
 				glClientWaitSync(fence[(m_iteration_index)& 1], 0, GL_TIMEOUT_IGNORED);
 				glGetSynciv(fence[(m_iteration_index)& 1], GL_SYNC_STATUS, sizeof(int), nullptr, &isSignaled);
-
 				glDeleteSync(fence[(m_iteration_index)& 1]);
 			}
 
 
 			gridOptimiser->join_Workers();
+			//glFlushMappedNamedBufferRange(m_grdBufferChunks_vbo[((m_iteration_index)& 1)], 0, GRIDLIST_SIZE);
+
+#if OPTIM_STRUCT == 7
 			glFlushMappedNamedBufferRange(m_grdBufferChunks_vbo[((m_iteration_index)& 1)], 0, GRIDLIST_SIZE);
-
-			if (requestRain > 0)
-			{
-				rain((m_iteration_index)& 1);
-				requestRain--;
-			}
-
+			((ArraysFromListsAllDataPerCellThreadPoolOptimiser*)gridOptimiser)->fillList(pointsBuffer[(m_iteration_index)& 1], gridBuffer[(m_iteration_index + 1) & 1], glass_pos, gridDataBuffer[(m_iteration_index + 1) & 1]);
+#else
 			gridOptimiser->fillList(pointsBuffer[(m_iteration_index)& 1], gridBuffer[(m_iteration_index + 1) & 1], glass_pos);
-
-			//m_iteration_index-=CHUNK_COUNT/2;//5;
+#endif
+					
 
 
 #elif(OPTIM_STRUCT >0)
@@ -1708,6 +2033,10 @@ public:
 			glBindTexture(GL_TEXTURE_BUFFER, m_GRIDLIST_tbo[m_iteration_index & 1]);
 			glActiveTexture(GL_TEXTURE3);
 			glBindTexture(GL_TEXTURE_BUFFER, m_density_tbo[m_iteration_index & 1]);
+#if OPTIM_STRUCT == 7
+			glActiveTexture(GL_TEXTURE4);
+			glBindTexture(GL_TEXTURE_BUFFER, m_GRID_DATA_tbo[m_iteration_index & 1]);
+#endif
 			//
 			//m_iteration_index++;//the only increment
 			glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, m_vbo[POSITION_A + ((m_iteration_index + 1) & 1)]);
@@ -2232,9 +2561,11 @@ private:
 	GLuint m_vao[2];
 	GLuint m_vbo[8];
 	GLuint m_grdBufferChunks_vbo[2];
+	GLuint m_GridDataBufferChunks_vbo[2];
 	GLuint m_index_buffer;
 	GLuint m_index_triangles_buffer;
 	GLuint m_GRIDLIST_tbo[2];
+	GLuint m_GRID_DATA_tbo[2];
 	GLuint m_pos_tbo[2];
 	GLuint m_vel_tbo[2];
 	GLuint m_density_tbo[2];
@@ -2318,7 +2649,12 @@ private:
 	vmath::vec3 repulsC;
 
 	int* gridBuffer[2];
+	float* gridDataBuffer[2];
 	vmath::vec3* pointsBuffer[2];
+	
+	vmath::vec4* velosityBuffer[2];	
+	vmath::vec2* density_pBuffer[2];
+
 
 	float fps;
 	float optTime;
