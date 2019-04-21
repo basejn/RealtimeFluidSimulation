@@ -8,7 +8,7 @@ layout (binding = 2) uniform isamplerBuffer tex_gridlist;
 layout (binding = 3) uniform samplerBuffer tex_griddata;
 
 
-#define OPTIM_STRUCT  3//0=no 1=array 2=lists 3=arrayAllNeighboursInCell
+#define OPTIM_STRUCT  4//0=no 1=array 2=lists 3=arrayAllNeighboursInCell 4=arrayAllNeighbourDataInCell
 const float GRID_VOLUME_SIDE=10;
 const int gridSide=15;
 const float cellSize=2*GRID_VOLUME_SIDE/gridSide;//GRID_VOLUME_SIDE/gridSide

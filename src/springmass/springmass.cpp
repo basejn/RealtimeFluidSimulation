@@ -75,7 +75,8 @@ const int GRIDLIST_SIZE = (GRID_SIDE * GRID_SIDE * GRID_SIDE * 3 + POINTS_TOTAL)
 #elif (OPTIM_STRUCT ==6)
 const int GRIDLIST_SIZE = (GRID_SIDE * GRID_SIDE * GRID_SIDE * 3 * (27*POINTS_TOTAL  / (GRID_SIDE * GRID_SIDE * GRID_SIDE)) ) * sizeof(int);
 #elif (OPTIM_STRUCT ==7)
-const int GRIDLIST_SIZE = (GRID_SIDE * GRID_SIDE * GRID_SIDE * 2) * sizeof(int);
+//const int GRIDLIST_SIZE = (GRID_SIDE * GRID_SIDE * GRID_SIDE * 2) * sizeof(int);
+const int GRIDLIST_SIZE = (GRID_SIDE * GRID_SIDE * GRID_SIDE * 3 * (27 * POINTS_TOTAL / (GRID_SIDE * GRID_SIDE * GRID_SIDE))) * sizeof(int);
 const int GRIDLIST_DATA_SIZE = (GRID_SIDE * GRID_SIDE * GRID_SIDE * 9 * (27 * POINTS_TOTAL / (GRID_SIDE * GRID_SIDE * GRID_SIDE))) * sizeof(float);
 #else
 const int GRIDLIST_SIZE = (GRID_SIDE*GRID_SIDE*GRID_SIDE*2+POINTS_TOTAL*2) * sizeof(int);
@@ -1065,6 +1066,39 @@ private:
 		}
 		myfile.close();
 	}
+	template<typename T,int len>
+	void printArrayVectors(std::string fileName, vecN<T,len>* gridBuffer,int length)
+	{
+		std::ofstream myfile;
+		myfile.open(fileName);
+
+		for (int i = 0; i < length; i++) // sizeof(gridBuffer) / gridBuffer[0]
+		{
+			myfile << "\n" << i<<":" ;
+			for (int j = 0; j < len; j++)
+			{
+				myfile <<"\t" << gridBuffer[i][j];
+			}
+		}
+		myfile.close();
+	}
+	template<typename T>
+	void printArray(std::string fileName, T* gridBuffer, int length,int stride)
+	{
+		std::ofstream myfile;
+		myfile.open(fileName);
+
+		for (int i = 0; i < length; i++) // sizeof(gridBuffer) / gridBuffer[0]
+		{
+			myfile << "\n" << i << ":";
+			for (int j = 0; j < stride; j++)
+			{
+				myfile << "\t" << gridBuffer[i+j];
+			}
+		}
+		myfile.close();
+	}
+
 
 	void worker(int id, std::atomic<bool>* my_Lock, std::atomic<bool>* my_fillListTaskLock, std::atomic<bool>* my_gridListKernelParallLock)
 	{
@@ -1183,27 +1217,33 @@ private:
 	}
 	void gridArraysAllIndsPerCellFromListKernel()
 	{
-		int lastUsedIndex = 0;
+		int lastUsedDataIndex = 0;
+			int lastUsedIndex = gridSize * 3;
 		for (int curInd = 0; curInd < gridSize; curInd++)
 		{
 			//calculate new array size : sum of all neighbouring cells sizes
 			auto neighbours = &neighbourIndCache[curInd];// genNeighbourInds(curInd);			
-			//auto neighbours1 = genNeighbourInds(curInd); auto neighbours = &neighbours1;
 
 			int curCelSize = 0;
 			for (auto neighbourCellInd : *neighbours)
 			{
 				curCelSize += gridBuffer[neighbourCellInd * 2 + 1];
 			}
-			curCelSize;
+			int curCellDataSize = curCelSize*10;
 
 			//prepare new array
-			int curentParticlePosIndex = lastUsedIndex; //new array position
-			lastUsedIndex += curCelSize + 1;			//update new free memory position
+			int curentParticleDataPosIndex = lastUsedDataIndex; //new array position
+			lastUsedDataIndex += curCellDataSize + 1;			//update new free memory position
 
+				int curentParticlePosIndex = lastUsedIndex; //new array position
+				lastUsedIndex += curCelSize + 1;			//update new free memory position
 
-			outGridBuffer[curInd * 2] = curentParticlePosIndex;//new array position
-			outGridBuffer[curInd * 2 + 1] = curCelSize;//size of new array
+			outGridDataBuffer[curentParticleDataPosIndex + curCellDataSize + 1] = 0;
+
+			outGridBuffer[curentParticlePosIndex + curCelSize + 1] = 0;
+			outGridBuffer[curInd * 3] = curentParticlePosIndex ;//new array position
+			outGridBuffer[curInd * 3 + 1] = curCelSize;//size of new array
+			outGridBuffer[curInd * 3 + 2] = curentParticleDataPosIndex;//pointer to data starting in outGridDataBuffer[outGridBuffer[curInd * 3 + 2]]
 
 			//fill indices from neighbours
 			for (auto neighbourCellInd : *neighbours)
@@ -1211,23 +1251,29 @@ private:
 				int curentIteratingIndex = gridBuffer[neighbourCellInd * 2];
 				while (curentIteratingIndex != 0)
 				{
-					int index= gridBuffer[curentIteratingIndex];// particle ind
+					int index = gridBuffer[curentIteratingIndex];// particle ind
+					outGridBuffer[curentParticlePosIndex++] = index;
+
 					curentIteratingIndex = gridBuffer[curentIteratingIndex + 1];//move to next (ind,next)pair
-					outGridDataBuffer[curentParticlePosIndex++] = this->pointsBuffer[index][0];
-					outGridDataBuffer[curentParticlePosIndex++] = this->pointsBuffer[index][1];
-					outGridDataBuffer[curentParticlePosIndex++] = this->pointsBuffer[index][2];
+					outGridDataBuffer[curentParticleDataPosIndex + 0] = this->pointsBuffer[index][0];
+					outGridDataBuffer[curentParticleDataPosIndex + 1] = this->pointsBuffer[index][1];
+					outGridDataBuffer[curentParticleDataPosIndex + 2] = this->pointsBuffer[index][2];
 
-					outGridDataBuffer[curentParticlePosIndex++] = this->velocityBuffer[index][0];// TODO memcpy probably faster
-					outGridDataBuffer[curentParticlePosIndex++] = this->velocityBuffer[index][1];
-					outGridDataBuffer[curentParticlePosIndex++] = this->velocityBuffer[index][2];
-					outGridDataBuffer[curentParticlePosIndex++] = this->velocityBuffer[index][4];
+					outGridDataBuffer[curentParticleDataPosIndex + 3] = this->velocityBuffer[index][0];// TODO memcpy probably faster
+					outGridDataBuffer[curentParticleDataPosIndex + 4] = this->velocityBuffer[index][1];
+					outGridDataBuffer[curentParticleDataPosIndex + 5] = this->velocityBuffer[index][2];
+					outGridDataBuffer[curentParticleDataPosIndex + 6] = this->velocityBuffer[index][4];
 
-					outGridDataBuffer[curentParticlePosIndex++] = this->density_pBuffer[index][0];
-					outGridDataBuffer[curentParticlePosIndex++] = this->density_pBuffer[index][1];
+					outGridDataBuffer[curentParticleDataPosIndex + 7] = this->density_pBuffer[index][0];
+					outGridDataBuffer[curentParticleDataPosIndex + 8] = this->density_pBuffer[index][1];
+					outGridDataBuffer[curentParticleDataPosIndex + 9] = index;
+					curentParticleDataPosIndex += 10;
+
 				}
 			}
-
 		}
+		//printArrayVectors("c:\\pointsBuffer.txt",pointsBuffer,POINTS_TOTAL);
+		//printArray("c:\\outGridDataBuffer.txt", outGridDataBuffer, lastUsedDataIndex,9);
 	}
 
 	void fillListTask()
@@ -2015,10 +2061,10 @@ public:
 
 
 			gridOptimiser->join_Workers();
-			//glFlushMappedNamedBufferRange(m_grdBufferChunks_vbo[((m_iteration_index)& 1)], 0, GRIDLIST_SIZE);
+			glFlushMappedNamedBufferRange(m_grdBufferChunks_vbo[((m_iteration_index)& 1)], 0, GRIDLIST_SIZE);
 
 #if OPTIM_STRUCT == 7
-			glFlushMappedNamedBufferRange(m_grdBufferChunks_vbo[((m_iteration_index)& 1)], 0, GRIDLIST_SIZE);			
+			glFlushMappedNamedBufferRange(m_GridDataBufferChunks_vbo[((m_iteration_index)& 1)], 0, GRIDLIST_DATA_SIZE);			
 			((ArraysFromListsAllDataPerCellThreadPoolOptimiser*)gridOptimiser)->fillList(pointsBuffer[(m_iteration_index)& 1], velosityBuffer[(m_iteration_index)& 1], density_pBuffer[(m_iteration_index)& 1], glass_pos, gridBuffer[(m_iteration_index + 1) & 1], gridDataBuffer[(m_iteration_index + 1) & 1]);
 #else
 			gridOptimiser->fillList(pointsBuffer[(m_iteration_index)& 1], gridBuffer[(m_iteration_index + 1) & 1], glass_pos);
