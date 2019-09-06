@@ -152,3 +152,5 @@ $RECYCLE.BIN/
 .DS_Store
 bin/springmass.exe
 bin/springmass_d.exe
+/.vs/ParticleSimulation/v16/Browse.VC.opendb
+/.vs
