@@ -154,3 +154,5 @@ bin/springmass.exe
 bin/springmass_d.exe
 /.vs/ParticleSimulation/v16/Browse.VC.opendb
 /.vs
+/bin/springmass.exe
+/bin/springmass_d.exe
