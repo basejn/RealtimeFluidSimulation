@@ -62,7 +62,7 @@ enum
 };
 
 #define INT_STATE_FROM_FILE 1
-#define OPTIM_STRUCT  7 //0=no 1=array 2=lists 3=listsParral 4=listsParralThreadPool 5=listsParralThreadPoolArrays 6=arrayAllNeighbourIndsInCell 7=arrayAllNeighbourDataInCell
+#define OPTIM_STRUCT  6 //0=no 1=array 2=lists 3=listsParral 4=listsParralThreadPool 5=listsParralThreadPoolArrays 6=arrayAllNeighbourIndsInCell 7=arrayAllNeighbourDataInCell
 
 const int GRID_SIDE =  15;
 const float GRID_VOLUME_SIDE = 20.0f; //+-10

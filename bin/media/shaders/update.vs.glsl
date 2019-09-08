@@ -45,7 +45,7 @@ uniform float sigma=1.0;
 uniform float surfTensTresh=0.02;//0.20;
 uniform float deltaT=0.050;
 const float h=1.5;
-#define OPTIM_STRUCT  4//0=no 1=array 2=lists 3=arrayAllNeighboursInCell 4=arrayAllNeighbourDataInCell
+#define OPTIM_STRUCT  3//0=no 1=array 2=lists 3=arrayAllNeighboursInCell 4=arrayAllNeighbourDataInCell
 const float GRID_VOLUME_SIDE=10;
 const int gridSide=15;
 const float cellSize=2*GRID_VOLUME_SIDE/gridSide;//GRID_VOLUME_SIDE/gridSide
@@ -269,13 +269,13 @@ float laplacian_W_poly6(float r){
 	}
 #if OPTIM_STRUCT <4
 	void doForCellIndexArrays(int myCell){	
-		int curInd = myCell*3;
+		int curInd = myCell*2;
 		int count = texelFetch(tex_gridlist,curInd+1).r;	
 		curInd = texelFetch(tex_gridlist,curInd).r;// mestim kym pyrwi element
 		while(count-- >0 ){	
 			int curParticleInd = texelFetch(tex_gridlist,curInd).r;	
 			//if(curParticleInd!=gl_VertexID)
-			forEveryParticle(curInd);
+			forEveryParticle(curParticleInd);
 			curInd++;
 		}
 	}	
