@@ -283,6 +283,35 @@
   <ItemGroup>
     <ClCompile Include="src\springmass\springmass.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="bin\media\shaders\fill.density.field.fs.glsl" />
+    <None Include="bin\media\shaders\fill.density.field.gs.glsl" />
+    <None Include="bin\media\shaders\fill.density.field.vs.glsl" />
+    <None Include="bin\media\shaders\Formated.render.fluid.raytrace.fs.glsl" />
+    <None Include="bin\media\shaders\Formated.update.vs.glsl" />
+    <None Include="bin\media\shaders\render.fluid.raytrace.fs.glsl" />
+    <None Include="bin\media\shaders\render.fluid.raytrace.fsBackup.glsl" />
+    <None Include="bin\media\shaders\render.fluid.raytrace.gs.glsl" />
+    <None Include="bin\media\shaders\render.fluid.raytrace.vs.glsl" />
+    <None Include="bin\media\shaders\render.fs.glsl" />
+    <None Include="bin\media\shaders\render.fs.sphere.glsl" />
+    <None Include="bin\media\shaders\render.gs.glsl" />
+    <None Include="bin\media\shaders\render.gs.sphere.glsl" />
+    <None Include="bin\media\shaders\render.vs.glsl" />
+    <None Include="bin\media\shaders\render.vs.sphere.glsl" />
+    <None Include="bin\media\shaders\render.wind.fs.glsl" />
+    <None Include="bin\media\shaders\render.wind.gs.glsl" />
+    <None Include="bin\media\shaders\render.wind.vs.glsl" />
+    <None Include="bin\media\shaders\render_mask.fs.glsl" />
+    <None Include="bin\media\shaders\render_mask.vs.glsl" />
+    <None Include="bin\media\shaders\skybox.fs.glsl" />
+    <None Include="bin\media\shaders\skybox.vs.glsl" />
+    <None Include="bin\media\shaders\update.fs.glsl" />
+    <None Include="bin\media\shaders\update.vs.glsl" />
+    <None Include="bin\media\shaders\update.vs.neibours cells array set.glsl" />
+    <None Include="bin\media\shaders\update.vs.neibours ofsetArray.glsl" />
+    <None Include="bin\media\shaders\update.vs.working water h5.glsl" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

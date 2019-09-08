@@ -4,10 +4,96 @@
     <Filter Include="Source Files">
       <UniqueIdentifier>{0277F2B4-F3F3-4AAD-96B9-7C038CAB3D99}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{c5d2fcdb-e61d-4163-882e-8173999eebb2}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\springmass\springmass.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="bin\media\shaders\fill.density.field.fs.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bin\media\shaders\fill.density.field.gs.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bin\media\shaders\fill.density.field.vs.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bin\media\shaders\Formated.render.fluid.raytrace.fs.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bin\media\shaders\Formated.update.vs.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bin\media\shaders\render.fluid.raytrace.fs.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bin\media\shaders\render.fluid.raytrace.fsBackup.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bin\media\shaders\render.fluid.raytrace.gs.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bin\media\shaders\render.fluid.raytrace.vs.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bin\media\shaders\render.fs.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bin\media\shaders\render.fs.sphere.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bin\media\shaders\render.gs.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bin\media\shaders\render.gs.sphere.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bin\media\shaders\render.vs.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bin\media\shaders\render.vs.sphere.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bin\media\shaders\render.wind.fs.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bin\media\shaders\render.wind.gs.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bin\media\shaders\render.wind.vs.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bin\media\shaders\render_mask.fs.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bin\media\shaders\render_mask.vs.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bin\media\shaders\skybox.fs.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bin\media\shaders\skybox.vs.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bin\media\shaders\update.fs.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bin\media\shaders\update.vs.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bin\media\shaders\update.vs.neibours cells array set.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bin\media\shaders\update.vs.neibours ofsetArray.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="bin\media\shaders\update.vs.working water h5.glsl">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>
