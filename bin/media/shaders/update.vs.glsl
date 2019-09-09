@@ -45,7 +45,7 @@ uniform float sigma=1.0;
 uniform float surfTensTresh=0.02;//0.20;
 uniform float deltaT=0.050;
 const float h=1.5;
-#define OPTIM_STRUCT  3//0=no 1=array 2=lists 3=arrayAllNeighboursInCell 4=arrayAllNeighbourDataInCell
+#define OPTIM_STRUCT 4 //0=no 1=array 2=lists 3=arrayAllNeighboursInCell 4=arrayAllNeighbourDataInCell
 const float GRID_VOLUME_SIDE=10;
 const int gridSide=15;
 const float cellSize=2*GRID_VOLUME_SIDE/gridSide;//GRID_VOLUME_SIDE/gridSide
@@ -240,8 +240,9 @@ float laplacian_W_poly6(float r){
 		}			
 	}
 	void forEveryParticleGridData(int i,int j){ /// tukaaa eeee		
-		//vec3 npos = texelFetch(tex_position,j).xyz;	
-		vec3 npos = vec3(texelFetch(tex_griddata,i).x , texelFetch(tex_griddata,i+1).x , texelFetch(tex_griddata,i+2).x);
+		// i = gridDataIndex , j = particelInd
+		vec3 npos = texelFetch(tex_position,j).xyz;	
+		//vec3 npos = vec3(texelFetch(tex_griddata,i).x , texelFetch(tex_griddata,i+1).x , texelFetch(tex_griddata,i+2).x);
 		//npos=npos1;
 		vec3 dstV =npos-position;			
 		float dst = length(dstV);
@@ -251,9 +252,9 @@ float laplacian_W_poly6(float r){
 			dstV/=dst;			
 			
 			vec4 n_velocity_mass = texelFetch(tex_velocity,j);	
-			//n_velocity_mass =vec4(texelFetch(tex_griddata,i+3).x , texelFetch(tex_griddata,i+4).x , texelFetch(tex_griddata,i+5).x, texelFetch(tex_griddata,i+6).x);
+			//vec4 n_velocity_mass =vec4(texelFetch(tex_griddata,i+3).x , texelFetch(tex_griddata,i+4).x , texelFetch(tex_griddata,i+5).x, texelFetch(tex_griddata,i+6).x);
 			vec2 n_density_pressure = texelFetch(tex_density,j).xy;	
-			//n_density_pressure =vec2(texelFetch(tex_griddata,i+7).x , texelFetch(tex_griddata,i+8).x);
+			//vec2 n_density_pressure =vec2(texelFetch(tex_griddata,i+7).x , texelFetch(tex_griddata,i+8).x);
 			
 			new_density_pressure.x+=n_velocity_mass.w*W_poly6(dst);
 			pressureF +=n_velocity_mass.w*(density_pressure.y+n_density_pressure.y)/(2*n_density_pressure.x)*gradient_W_spiky(dst)*dstV;
@@ -294,11 +295,13 @@ float laplacian_W_poly6(float r){
 #elif OPTIM_STRUCT==4	
 	void doForCellIndexArrays(int myCell){	
 		int curInd = myCell*3;			
-		int j = texelFetch(tex_gridlist,curInd).r;// mestim kym pyrwi element
-		int count = texelFetch(tex_gridlist,curInd+1).r;
-		int i = texelFetch(tex_gridlist,curInd+2).r;// mestim kym pyrwi element
+		int j = texelFetch(tex_gridlist,curInd).r;// gridIndex
+		int count = texelFetch(tex_gridlist,curInd+1).r; // Num elements
+		int i = texelFetch(tex_gridlist,curInd+2).r;// gridDataIndex
 		while(count-- >0 ){		
-			forEveryParticleGridData(i,int(texelFetch(tex_griddata,i+9).r));
+			//int curParticleInd = texelFetch(tex_gridlist,j).r;	
+			int curParticleInd = int(texelFetch(tex_griddata,i+9).r);
+			forEveryParticleGridData(i,curParticleInd);
 			i+=10;
 			j++;	
 		}
