@@ -77,7 +77,7 @@ const int GRIDLIST_SIZE = (GRID_SIDE * GRID_SIDE * GRID_SIDE * 3 * (27*POINTS_TO
 #elif (OPTIM_STRUCT ==7)
 //const int GRIDLIST_SIZE = (GRID_SIDE * GRID_SIDE * GRID_SIDE * 2) * sizeof(int);
 const int GRIDLIST_SIZE = (GRID_SIDE * GRID_SIDE * GRID_SIDE * 3 * (27 * POINTS_TOTAL / (GRID_SIDE * GRID_SIDE * GRID_SIDE))) * sizeof(int);
-const int GRIDLIST_DATA_SIZE = (GRID_SIDE * GRID_SIDE * GRID_SIDE * 9 * (27 * POINTS_TOTAL / (GRID_SIDE * GRID_SIDE * GRID_SIDE))) * sizeof(float);
+const int GRIDLIST_DATA_SIZE = (GRID_SIDE * GRID_SIDE * GRID_SIDE * 10 * (27 * POINTS_TOTAL / (GRID_SIDE * GRID_SIDE * GRID_SIDE))) * sizeof(float);
 #else
 const int GRIDLIST_SIZE = (GRID_SIDE*GRID_SIDE*GRID_SIDE*2+POINTS_TOTAL*2) * sizeof(int);
 #endif
@@ -1050,17 +1050,17 @@ public:
 		}
 	}
 
-	void gridArraysAllIndsPerCellFromListKernel(vmath::vec3* pointsBuffer,vec4* velocityBuffer, vec2* density_pBuffer, int* outGridBuffer, float* outGridDataBuffer)
+	void gridArraysAllIndsPerCellFromListKernel(vec3* pointsBuffer,vec4* velocityBuffer, vec2* density_pBuffer, int* outGridBuffer, float* outGridDataBuffer)
 	{
 		int lastUsedDataIndex = 0;
 		int lastUsedIndex = gridSize * 3;
 		for (int curInd = 0; curInd < gridSize; curInd++)
 		{
 			//calculate new array size : sum of all neighbouring cells sizes
-			auto neighbours = &neighbourIndCache[curInd];// genNeighbourInds(curInd);			
+			auto& neighbours = neighbourIndCache[curInd];// genNeighbourInds(curInd);			
 
 			int curCelSize = 0;
-			for (auto neighbourCellInd : *neighbours)
+			for (auto neighbourCellInd : neighbours)
 			{
 				curCelSize += gridBuffer[neighbourCellInd * 2 + 1];
 			}
@@ -1081,7 +1081,7 @@ public:
 			outGridBuffer[curInd * 3 + 2] = curentParticleDataPosIndex;//pointer to data starting in outGridDataBuffer[outGridBuffer[curInd * 3 + 2]]
 
 			//fill indices from neighbours
-			for (auto neighbourCellInd : *neighbours)
+			for (auto& neighbourCellInd : neighbours)
 			{
 				int curentIteratingIndex = gridBuffer[neighbourCellInd * 2];
 				while (curentIteratingIndex != 0)
@@ -1097,7 +1097,7 @@ public:
 					outGridDataBuffer[curentParticleDataPosIndex + 3] = velocityBuffer[index][0];// TODO memcpy probably faster
 					outGridDataBuffer[curentParticleDataPosIndex + 4] = velocityBuffer[index][1];
 					outGridDataBuffer[curentParticleDataPosIndex + 5] = velocityBuffer[index][2];
-					outGridDataBuffer[curentParticleDataPosIndex + 6] = velocityBuffer[index][4];
+					outGridDataBuffer[curentParticleDataPosIndex + 6] = velocityBuffer[index][3];
 
 					outGridDataBuffer[curentParticleDataPosIndex + 7] = density_pBuffer[index][0];
 					outGridDataBuffer[curentParticleDataPosIndex + 8] = density_pBuffer[index][1];
@@ -2646,7 +2646,7 @@ private:
 	bool draw_raytrace;
 	bool draw_skybox;
 	int iterations_per_frame;
-	int requestRain;
+	int requestRain=0;
 
 	GLuint mv_mat_skybox_loc;
 	GLuint proj_mat_skybox_loc;

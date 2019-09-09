@@ -241,8 +241,8 @@ float laplacian_W_poly6(float r){
 	}
 	void forEveryParticleGridData(int i,int j){ /// tukaaa eeee		
 		// i = gridDataIndex , j = particelInd
-		vec3 npos = texelFetch(tex_position,j).xyz;	
-		//vec3 npos = vec3(texelFetch(tex_griddata,i).x , texelFetch(tex_griddata,i+1).x , texelFetch(tex_griddata,i+2).x);
+		//vec3 npos = texelFetch(tex_position,j).xyz;	
+		vec3 npos = vec3(texelFetch(tex_griddata,i).x , texelFetch(tex_griddata,i+1).x , texelFetch(tex_griddata,i+2).x);
 		//npos=npos1;
 		vec3 dstV =npos-position;			
 		float dst = length(dstV);
@@ -251,10 +251,10 @@ float laplacian_W_poly6(float r){
 			if((dst)<0.001){return;	dstV=vec3(1,1,1);dst=1;}
 			dstV/=dst;			
 			
-			vec4 n_velocity_mass = texelFetch(tex_velocity,j);	
-			//vec4 n_velocity_mass =vec4(texelFetch(tex_griddata,i+3).x , texelFetch(tex_griddata,i+4).x , texelFetch(tex_griddata,i+5).x, texelFetch(tex_griddata,i+6).x);
-			vec2 n_density_pressure = texelFetch(tex_density,j).xy;	
-			//vec2 n_density_pressure =vec2(texelFetch(tex_griddata,i+7).x , texelFetch(tex_griddata,i+8).x);
+			//vec4 n_velocity_mass = texelFetch(tex_velocity,j);	
+			vec4 n_velocity_mass =vec4(texelFetch(tex_griddata,i+3).x , texelFetch(tex_griddata,i+4).x ,  texelFetch(tex_griddata,i+5).x, texelFetch(tex_griddata,i+6).x);
+			//vec2 n_density_pressure = texelFetch(tex_density,j).xy;	
+			vec2 n_density_pressure =vec2(texelFetch(tex_griddata,i+7).x , texelFetch(tex_griddata,i+8).x);
 			
 			new_density_pressure.x+=n_velocity_mass.w*W_poly6(dst);
 			pressureF +=n_velocity_mass.w*(density_pressure.y+n_density_pressure.y)/(2*n_density_pressure.x)*gradient_W_spiky(dst)*dstV;
