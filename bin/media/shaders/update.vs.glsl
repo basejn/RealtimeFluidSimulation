@@ -239,32 +239,23 @@ float laplacian_W_poly6(float r){
 			color_field_laplacian+=n_velocity_mass.w/n_density_pressure.x*laplacian_W_poly6(dst);
 		}			
 	}
-	void forEveryParticleGridData(int i,int j){ /// tukaaa eeee		
-		// i = gridDataIndex , j = particelInd
-		//vec3 npos = texelFetch(tex_position,j).xyz;	
-		vec3 npos = vec3(texelFetch(tex_griddata,i).x , texelFetch(tex_griddata,i+1).x , texelFetch(tex_griddata,i+2).x);
-		//npos=npos1;
+	void forEveryParticleGridData(int i){ /// tukaaa eeee						
+		vec3 npos = vec3(texelFetch(tex_griddata,i).x , texelFetch(tex_griddata,i+1).x , texelFetch(tex_griddata,i+2).x);		
 		vec3 dstV =npos-position;			
 		float dst = length(dstV);
 		if(dst<=h)
 		{
 			if((dst)<0.001){return;	dstV=vec3(1,1,1);dst=1;}
 			dstV/=dst;			
-			
-			//vec4 n_velocity_mass = texelFetch(tex_velocity,j);	
-			vec4 n_velocity_mass =vec4(texelFetch(tex_griddata,i+3).x , texelFetch(tex_griddata,i+4).x ,  texelFetch(tex_griddata,i+5).x, texelFetch(tex_griddata,i+6).x);
-			//vec2 n_density_pressure = texelFetch(tex_density,j).xy;	
+					
+			vec4 n_velocity_mass =vec4(texelFetch(tex_griddata,i+3).x , texelFetch(tex_griddata,i+4).x ,  texelFetch(tex_griddata,i+5).x, texelFetch(tex_griddata,i+6).x);			
 			vec2 n_density_pressure =vec2(texelFetch(tex_griddata,i+7).x , texelFetch(tex_griddata,i+8).x);
 			
 			new_density_pressure.x+=n_velocity_mass.w*W_poly6(dst);
 			pressureF +=n_velocity_mass.w*(density_pressure.y+n_density_pressure.y)/(2*n_density_pressure.x)*gradient_W_spiky(dst)*dstV;
-			
-			//pressureF +=density_pressure.x *n_velocity_mass.w*(density_pressure.y/(density_pressure.x*density_pressure.x)+n_density_pressure.y/(n_density_pressure.x*n_density_pressure.x))*gradient_W_spiky(dst)*dstV;
 				
 			viscosityF+=eta*n_velocity_mass.w*((n_velocity_mass.xyz-velocity_mass.xyz))/n_density_pressure.x*laplacian_W_viscosity(dst);
-			color_field_gradient+=n_velocity_mass.w/n_density_pressure.x*gradient_W_poly6(dst)*dstV;
-			//color_field_gradient+=n_velocity_mass.w/n_density_pressure.x*vec3(gradient_W_poly6(dstV.x),gradient_W_poly6(dstV.y),gradient_W_poly6(dstV.z));
-			//color_field_laplacian+=n_velocity_mass.w/n_density_pressure.x*laplacian_W_poly6(dst)*dstV;
+			color_field_gradient+=n_velocity_mass.w/n_density_pressure.x*gradient_W_poly6(dst)*dstV;			
 			color_field_laplacian+=n_velocity_mass.w/n_density_pressure.x*laplacian_W_poly6(dst);
 		}			
 	}
@@ -298,10 +289,8 @@ float laplacian_W_poly6(float r){
 		int j = texelFetch(tex_gridlist,curInd).r;// gridIndex
 		int count = texelFetch(tex_gridlist,curInd+1).r; // Num elements
 		int i = texelFetch(tex_gridlist,curInd+2).r;// gridDataIndex
-		while(count-- >0 ){		
-			//int curParticleInd = texelFetch(tex_gridlist,j).r;	
-			int curParticleInd = int(texelFetch(tex_griddata,i+9).r);
-			forEveryParticleGridData(i,curParticleInd);
+		while(count-- >0 ){									
+			forEveryParticleGridData(i);
 			i+=10;
 			j++;	
 		}

@@ -1089,26 +1089,16 @@ public:
 					int index = gridBuffer[curentIteratingIndex];// particle ind
 					outGridBuffer[curentParticlePosIndex++] = index;
 
-					curentIteratingIndex = gridBuffer[curentIteratingIndex + 1];//move to next (ind,next)pair
-					outGridDataBuffer[curentParticleDataPosIndex + 0] = pointsBuffer[index][0];
-					outGridDataBuffer[curentParticleDataPosIndex + 1] = pointsBuffer[index][1];
-					outGridDataBuffer[curentParticleDataPosIndex + 2] = pointsBuffer[index][2];
-
-					outGridDataBuffer[curentParticleDataPosIndex + 3] = velocityBuffer[index][0];// TODO memcpy probably faster
-					outGridDataBuffer[curentParticleDataPosIndex + 4] = velocityBuffer[index][1];
-					outGridDataBuffer[curentParticleDataPosIndex + 5] = velocityBuffer[index][2];
-					outGridDataBuffer[curentParticleDataPosIndex + 6] = velocityBuffer[index][3];
-
-					outGridDataBuffer[curentParticleDataPosIndex + 7] = density_pBuffer[index][0];
-					outGridDataBuffer[curentParticleDataPosIndex + 8] = density_pBuffer[index][1];
+					curentIteratingIndex = gridBuffer[curentIteratingIndex + 1];//move to next (ind,next)pair					
+					memcpy(outGridDataBuffer + curentParticleDataPosIndex, pointsBuffer[index], 3*sizeof(float));
+					memcpy(outGridDataBuffer + curentParticleDataPosIndex + 3, velocityBuffer[index], 4 *sizeof(float));
+					memcpy(outGridDataBuffer + curentParticleDataPosIndex + 7, density_pBuffer[index], 2 *sizeof(float));
+					
 					outGridDataBuffer[curentParticleDataPosIndex + 9] = index;
 					curentParticleDataPosIndex += 10;
-
 				}
 			}
-		}
-		//printArrayVectors("c:\\pointsBuffer.txt",pointsBuffer,POINTS_TOTAL);
-		//printArray("c:\\outGridDataBuffer.txt", outGridDataBuffer, lastUsedDataIndex,9);
+		}		
 	}
 
 	
@@ -2080,15 +2070,18 @@ public:
 			std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
 			optTime = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count() / 1000.0;//OptimJoin
 
-			
+			#if OPTIM_STRUCT != 7
 			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_BUFFER, m_pos_tbo[m_iteration_index & 1]); //TODO Dont bind  if Mode 7 
+			glBindTexture(GL_TEXTURE_BUFFER, m_pos_tbo[m_iteration_index & 1]);
 			glActiveTexture(GL_TEXTURE1);
-			glBindTexture(GL_TEXTURE_BUFFER, m_vel_tbo[m_iteration_index & 1]);
-			glActiveTexture(GL_TEXTURE2);
-			glBindTexture(GL_TEXTURE_BUFFER, m_GRIDLIST_tbo[m_iteration_index & 1]);
+			glBindTexture(GL_TEXTURE_BUFFER, m_vel_tbo[m_iteration_index & 1]);			
 			glActiveTexture(GL_TEXTURE3);
 			glBindTexture(GL_TEXTURE_BUFFER, m_density_tbo[m_iteration_index & 1]);
+			#endif
+			
+			glActiveTexture(GL_TEXTURE2);
+			glBindTexture(GL_TEXTURE_BUFFER, m_GRIDLIST_tbo[m_iteration_index & 1]);
+			
 #if OPTIM_STRUCT == 7
 			glActiveTexture(GL_TEXTURE4);
 			glBindTexture(GL_TEXTURE_BUFFER, m_GRID_DATA_tbo[m_iteration_index & 1]);
