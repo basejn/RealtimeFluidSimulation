@@ -1,4 +1,4 @@
-#version 410 core
+#version 420 core
 
 layout (location = 0) in vec3 vert;
 layout (binding = 0) uniform samplerBuffer tex_position;

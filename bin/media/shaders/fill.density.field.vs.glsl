@@ -1,7 +1,7 @@
-#version 410 core
+#version 420 core
 
 layout (binding = 0) uniform samplerBuffer tex_position;
-layout (binding = 1) uniform isamplerBuffer tex_gridlist;
+layout (binding = 2) uniform isamplerBuffer tex_gridlist;
 
 
  out VS_OUT

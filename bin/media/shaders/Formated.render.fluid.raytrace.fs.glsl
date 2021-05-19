@@ -1,4 +1,4 @@
-#version 410 core
+#version 420 core
 #define PI 3.1415926535897932384626433832795
 layout (location = 0) out vec4 color;
 

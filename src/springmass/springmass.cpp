@@ -1606,7 +1606,7 @@ public:
 
 		glGenTextures(1, &m_color_tbo);
 		glBindTexture(GL_TEXTURE_BUFFER, m_color_tbo);
-		glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA, m_vbo[COLORS]);
+		glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA8UI, m_vbo[COLORS]);
 
 
 		//	glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
@@ -2607,7 +2607,7 @@ private:
 	GLuint mask_vao;
 	GLuint timerQueries[2];
 	GLuint m_vao[2];
-	GLuint m_vbo[8];
+	GLuint m_vbo[10];
 	GLuint m_grdBufferChunks_vbo[2];
 	GLuint m_GridDataBufferChunks_vbo[2];
 	GLuint m_index_buffer;

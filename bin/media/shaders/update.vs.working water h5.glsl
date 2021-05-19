@@ -1,4 +1,4 @@
-#version 410 core
+#version 420 core
 #define PI 3.1415926535897932384626433832795
 // This input vector contains the vertex position in xyz, and the
 // mass of the vertex in w
