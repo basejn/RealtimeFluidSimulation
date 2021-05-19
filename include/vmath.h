@@ -264,7 +264,7 @@ protected:
     }
 };
 template<typename T, int len>
-	std::ostream& operator<<(std::ostream& stream, const vecN<T,len>& dt){
+	std::ostream& operator<<(std::ostream& stream, const vecN<T,len>& data){
 	stream << "[";
 	for (int i = 0; i < len; i++)
 		stream << " " << data[i];

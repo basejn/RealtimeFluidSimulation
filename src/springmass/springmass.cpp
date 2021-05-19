@@ -1445,7 +1445,7 @@ public:
 		if (myfile)
 			DBOUT("\nSiccessful read of file init Particle State")
 		else
-		DBOUT("\FAIL ERROR read of file init Particle State");
+		DBOUT("\nFAIL ERROR read of file init Particle State");
 		myfile.close();
 #endif
 
@@ -1644,7 +1644,7 @@ public:
 		delete initial_density_pressure;
 	}
 
-	template <class T>
+	/*template <class T>
 	std::vector<T, std::allocator<T>> vectorFromPointer(T* sourceArray, size_t arraySize)
 	{
 		std::vector<T, std::allocator<T>> targetVector();
@@ -1653,8 +1653,7 @@ public:
 		vectorPtr->_M_start = sourceArray;
 		vectorPtr->_M_finish = vectorPtr->_M_end_of_storage = vectorPtr->_M_start + arraySize;
 		return targetVector;
-	}
-
+	}*/
 	void isAnyNanInf()
 	{
 		//std::unique_ptr<vmath::vec3[]> initial_positions(new vmath::vec3[POINTS_TOTAL]);
