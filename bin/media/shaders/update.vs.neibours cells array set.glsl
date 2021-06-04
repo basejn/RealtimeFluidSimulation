@@ -1,5 +1,5 @@
 // just a coment for git gg to make change another changessssssssssssssss 
-#version 420 core
+#version 430 core
 #define PI 3.1415926535897932384626433832795
 #define OPTIM_STRUCT  0 //0=no 1=array 2=lists
 // This input vector contains the vertex position in xyz, and the

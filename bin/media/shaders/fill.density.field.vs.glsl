@@ -1,4 +1,4 @@
-#version 420 core
+#version 430 core
 
 layout (binding = 0) uniform samplerBuffer tex_position;
 layout (binding = 2) uniform isamplerBuffer tex_gridlist;

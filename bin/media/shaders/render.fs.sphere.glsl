@@ -1,4 +1,4 @@
-#version 420 core
+#version 430 core
 
 layout (location = 0) out vec4 color;
 //layout (binding = 1) uniform sampler2D main_texture;
