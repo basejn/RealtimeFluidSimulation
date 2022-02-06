@@ -132,6 +132,12 @@ public:
 		//	for (auto& t : v)t.join();
 	}
 
+	void join_Workers() {}
+
+	bool is_ready() {
+		return true;
+	}
+
 private:
 	vmath::vec3 offset_vec;
 	int* gridBuffer;
@@ -234,6 +240,12 @@ public:
 		myfile.close();
 	}
 
+	void join_Workers() {}
+
+	bool is_ready() {
+		return true;
+	}
+
 private:
 	vmath::vec3 offset_vec;
 	int* gridBuffer;
@@ -301,6 +313,12 @@ public:
 			myfile << "\n" << i << ":\t" << gridBuffer[i];
 		}
 		myfile.close();
+	}
+
+	void join_Workers() {}
+
+	bool is_ready() {
+		return true;
 	}
 
 protected:
@@ -1312,7 +1330,7 @@ class springmass_app : public sb7::application
 {
 public:
 	//GridListsOfListsOptimiser* gridOptimiser;
-	GridOptimiser* gridOptimiser;
+	GridOptimiser* gridOptimiser=0;
 	sb7::text_overlay overlay;
 
 	springmass_app()
@@ -1827,8 +1845,10 @@ public:
 
 		sprintf(buffer, "OptimJoin: %3.2fms", optTime);
 		overlay.drawText(buffer, 0, 1);
-		sprintf(buffer, "Optim: %3.2fms", gridOptimiser->optTime);
-		overlay.drawText(buffer, 0, 2);
+		if (gridOptimiser != 0){
+			sprintf(buffer, "Optim: %3.2fms", gridOptimiser->optTime);
+			overlay.drawText(buffer, 0, 2);
+		}
 		sprintf(buffer, "Update: %3.2fms", updateTime);
 		overlay.drawText(buffer, 0, 3);
 		if (stalling)
