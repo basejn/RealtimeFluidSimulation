@@ -1,5 +1,5 @@
 #version 430 core
-#define texture_Depth 64
+#define texture_Depth 32
 layout (invocations = texture_Depth , triangles) in;
 layout (triangle_strip, max_vertices = 3) out;
 

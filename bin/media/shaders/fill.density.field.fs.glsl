@@ -8,7 +8,7 @@ layout (binding = 2) uniform isamplerBuffer tex_gridlist;
 layout (binding = 3) uniform samplerBuffer tex_griddata;
 
 
-#define OPTIM_STRUCT  4//0=no 1=array 2=lists 3=arrayAllNeighboursInCell 4=arrayAllNeighbourDataInCell
+#define OPTIM_STRUCT  3//0=no 1=array 2=lists 3=arrayAllNeighboursInCell 4=arrayAllNeighbourDataInCell
 const float GRID_VOLUME_SIDE=10;
 const int gridSide=15;
 const float cellSize=2*GRID_VOLUME_SIDE/gridSide;//GRID_VOLUME_SIDE/gridSide
@@ -67,30 +67,30 @@ float W_poly6(float r){
 	
 
 	
-	void doForCellIndexLists(int myCell){	
-		int curInd = myCell*2;
-		int counts = texelFetch(tex_gridlist,curInd+1).r;	
-		curInd = texelFetch(tex_gridlist,curInd).r;// mestim kym pyrwi element
-		while(curInd!=0){
-			int curParticleInd = texelFetch(tex_gridlist,curInd).r;
-			forEveryParticle(curParticleInd);
-			curInd = texelFetch(tex_gridlist,curInd+1).r;// mestim kym sledwashtiq element
-		}
-	}	
-	
-	void doForCellIndexArrays(int myCell){	
-		int curInd = myCell*2;
-		int count = texelFetch(tex_gridlist,curInd+1).r;	
-		curInd = texelFetch(tex_gridlist,curInd).r;// mestim kym pyrwi element
-		while(count-- >0){	
-			int curParticleInd = texelFetch(tex_gridlist,curInd).r;	
-			forEveryParticle(curParticleInd);
-			curInd++;
-		}
+void doForCellIndexLists(int myCell){	
+	int curInd = myCell*2;
+	int counts = texelFetch(tex_gridlist,curInd+1).r;	
+	curInd = texelFetch(tex_gridlist,curInd).r;// mestim kym pyrwi element
+	while(curInd!=0){
+		int curParticleInd = texelFetch(tex_gridlist,curInd).r;
+		forEveryParticle(curParticleInd);
+		curInd = texelFetch(tex_gridlist,curInd+1).r;// mestim kym sledwashtiq element
 	}
+}	
+
+void doForCellIndexArrays(int myCell){	
+	int curInd = myCell*2;
+	int count = texelFetch(tex_gridlist,curInd+1).r;	
+	curInd = texelFetch(tex_gridlist,curInd).r;// mestim kym pyrwi element
+	while(count-- >0){	
+		int curParticleInd = texelFetch(tex_gridlist,curInd).r;	
+		forEveryParticle(curParticleInd);
+		curInd++;
+	}
+}
 
 		
-	float preasureInPoint(vec3 point){	
+float preasureInPoint(vec3 point){	
 	curPos = point;
 	tmpDensity = 0;//tmpNorm=vec3(0);tmpColor=vec4(0,0,0,1);
  #if (OPTIM_STRUCT>0)

@@ -62,13 +62,13 @@ enum
 };
 
 #define INT_STATE_FROM_FILE 1
-#define OPTIM_STRUCT  7 //0=no 1=array 2=lists 3=listsParral 4=listsParralThreadPool 5=listsParralThreadPoolArrays 6=arrayAllNeighbourIndsInCell 7=arrayAllNeighbourDataInCell
+#define OPTIM_STRUCT  6 //0=no 1=array 2=lists 3=listsParral 4=listsParralThreadPool 5=listsParralThreadPoolArrays 6=arrayAllNeighbourIndsInCell 7=arrayAllNeighbourDataInCell
 
 const int GRID_SIDE =  15;
 const float GRID_VOLUME_SIDE = 20.0f; //+-10
 const float GRID_OFFSET = 10.0f; //+-10
 const float CELL_SIZE = GRID_VOLUME_SIDE / GRID_SIDE;
-const int DENSITY_TEX_SIDE = 64;// trqbva da se promeni i v GeometryShadera
+const int DENSITY_TEX_SIDE = 32;// trqbva da se promeni i v GeometryShadera
 const int CELL_COUNT = GRID_SIDE * GRID_SIDE * GRID_SIDE;
 #if (OPTIM_STRUCT ==1||OPTIM_STRUCT ==5)
 const int GRIDLIST_SIZE = (GRID_SIDE * GRID_SIDE * GRID_SIDE * 3 + POINTS_TOTAL) * sizeof(int);
