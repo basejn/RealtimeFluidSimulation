@@ -68,7 +68,7 @@ const int GRID_SIDE =  15;
 const float GRID_VOLUME_SIDE = 20.0f; //+-10
 const float GRID_OFFSET = 10.0f; //+-10
 const float CELL_SIZE = GRID_VOLUME_SIDE / GRID_SIDE;
-const int DENSITY_TEX_SIDE = 32;// trqbva da se promeni i v GeometryShadera
+const int DENSITY_TEX_SIDE = 64.0;// trqbva da se promeni i v GeometryShadera
 const int CELL_COUNT = GRID_SIDE * GRID_SIDE * GRID_SIDE;
 #if (OPTIM_STRUCT ==1||OPTIM_STRUCT ==5)
 const int GRIDLIST_SIZE = (GRID_SIDE * GRID_SIDE * GRID_SIDE * 3 + POINTS_TOTAL) * sizeof(int);
