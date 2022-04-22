@@ -1834,6 +1834,7 @@ public:
 
 		overlay.clear();
 		sprintf(buffer, "%2.2fms / frame (%4.2f FPS)", 1000.0f / fps, fps);
+		DBOUT(buffer << '\n')
 		overlay.drawText(buffer, 0, 0);
 		//	memset(buffer,0,256);
 		//	sprintf(buffer, "atract = 1 / %2.2f*r^2 + %2.2f*r + %2.2f)",atractC[0],atractC[1],atractC[2]);
@@ -1844,19 +1845,22 @@ public:
 
 
 		sprintf(buffer, "OptimJoin: %3.2fms", optTime);
+		DBOUT(buffer << '\n')
 		overlay.drawText(buffer, 0, 1);
 		if (gridOptimiser != 0){
 			sprintf(buffer, "Optim: %3.2fms", gridOptimiser->optTime);
+			DBOUT(buffer << '\n')
 			overlay.drawText(buffer, 0, 2);
 		}
 		sprintf(buffer, "Update: %3.2fms", updateTime);
+		DBOUT(buffer<<'\n')
 		overlay.drawText(buffer, 0, 3);
 		if (stalling)
 		{
 			sprintf(buffer, "Stalling!!!");
 			overlay.drawText(buffer, 0, 4);
 		}
-
+		DBOUT("\n\n")
 		overlay.draw();
 	}
 
