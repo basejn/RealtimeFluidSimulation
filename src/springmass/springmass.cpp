@@ -1394,7 +1394,7 @@ public:
 #elif (OPTIM_STRUCT ==5)
 		gridOptimiser = new ArraysFromListsThreadPoolOptimiser(POINTS_TOTAL, GRID_SIDE, CELL_SIZE, GRID_OFFSET, 1);
 #elif (OPTIM_STRUCT ==6)
-		gridOptimiser = new ArraysFromListsAllIndsPerCellThreadPoolOptimiser(POINTS_TOTAL, GRID_SIDE, CELL_SIZE, GRID_OFFSET, 1);
+		gridOptimiser = new ArraysFromListsAllIndsPerCellThreadPoolOptimiser(POINTS_TOTAL, GRID_SIDE, CELL_SIZE, GRID_OFFSET, 4);
 #elif (OPTIM_STRUCT ==7)
 		gridOptimiser = new ArraysFromListsAllDataPerCellThreadPoolOptimiser(POINTS_TOTAL, GRID_SIDE, CELL_SIZE, GRID_OFFSET, 1);
 
