@@ -2057,7 +2057,7 @@ public:
 			std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 
 #if(OPTIM_STRUCT==4||OPTIM_STRUCT==5||OPTIM_STRUCT==6 || OPTIM_STRUCT==7)
-			//glFinish();		
+			glFinish();		
 
 			//m_iteration_index+=CHUNK_COUNT/2 ;//5;
 			//std::this_thread::sleep_for(std::chrono::milliseconds(10));
