@@ -1057,7 +1057,7 @@ private:
 			worker_Locs[i] = (true);
 		}
 	}
-
+		
 	std::vector<int> neighbourIndCache[GRID_SIDE*GRID_SIDE*GRID_SIDE];
 	std::atomic<bool>* worker_Locs;
 	std::atomic<bool>* gridListKernelParall_Locs;
@@ -1563,19 +1563,19 @@ public:
 			glBindVertexArray(m_vao[i]);
 
 			glBindBuffer(GL_ARRAY_BUFFER, m_vbo[POSITION_A + i]);			
-			glBufferStorage(GL_ARRAY_BUFFER, POSITIONS_SIZE, initial_positions, GL_DYNAMIC_STORAGE_BIT | GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT);
+			glBufferStorage(GL_ARRAY_BUFFER, POSITIONS_SIZE, initial_positions, GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
 			//glBufferData(GL_ARRAY_BUFFER, POSITIONS_SIZE, initial_positions, GL_DYNAMIC_COPY);
 			glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
 			glEnableVertexAttribArray(0);
 
 			glBindBuffer(GL_ARRAY_BUFFER, m_vbo[VELOCITY_A + i]);
-			glBufferStorage(GL_ARRAY_BUFFER, POINTS_TOTAL * sizeof(vmath::vec4), initial_velocities, GL_DYNAMIC_STORAGE_BIT | GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT);			
+			glBufferStorage(GL_ARRAY_BUFFER, POINTS_TOTAL * sizeof(vmath::vec4), initial_velocities, GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
 			//glBufferData(GL_ARRAY_BUFFER, POINTS_TOTAL * sizeof(vmath::vec4), initial_velocities, GL_DYNAMIC_COPY);
 			glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, NULL);
 			glEnableVertexAttribArray(1);
 
 			glBindBuffer(GL_ARRAY_BUFFER, m_vbo[DENSITY_A + i]);
-			glBufferStorage(GL_ARRAY_BUFFER, POINTS_TOTAL * sizeof(vmath::vec2), initial_density_pressure, GL_DYNAMIC_STORAGE_BIT | GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT);			
+			glBufferStorage(GL_ARRAY_BUFFER, POINTS_TOTAL * sizeof(vmath::vec2), initial_density_pressure, GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
 			//glBufferData(GL_ARRAY_BUFFER, POINTS_TOTAL * sizeof(vmath::vec2), initial_density_pressure, GL_DYNAMIC_COPY);
 			glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, NULL);
 			glEnableVertexAttribArray(2);
@@ -1609,20 +1609,27 @@ public:
 #if(OPTIM_STRUCT ==4||OPTIM_STRUCT ==5||OPTIM_STRUCT ==6)
 		glGenBuffers(2, m_grdBufferChunks_vbo);
 		glGenTextures(2, m_GRIDLIST_tbo);
-		pointsBuffer[0] = (vmath::vec3 *)glMapNamedBufferRange(m_vbo[POSITION_A], 0, POSITIONS_SIZE, GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT);
-		pointsBuffer[1] = (vmath::vec3 *)glMapNamedBufferRange(m_vbo[POSITION_A + 1], 0, POSITIONS_SIZE, GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT);
+		pointsBuffer[0] = (vmath::vec3 *)glMapNamedBufferRange(m_vbo[POSITION_A], 0, POSITIONS_SIZE, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
+		pointsBuffer[1] = (vmath::vec3 *)glMapNamedBufferRange(m_vbo[POSITION_A + 1], 0, POSITIONS_SIZE, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
+
+		velosityBuffer[0] = (vmath::vec4*)glMapNamedBufferRange(m_vbo[VELOCITY_A], 0, POINTS_TOTAL * sizeof(vmath::vec4), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
+		velosityBuffer[1] = (vmath::vec4*)glMapNamedBufferRange(m_vbo[VELOCITY_A + 1], 0, POINTS_TOTAL * sizeof(vmath::vec4), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
+
+		density_pBuffer[0] = (vmath::vec2*)glMapNamedBufferRange(m_vbo[DENSITY_A], 0, POINTS_TOTAL * sizeof(vmath::vec2), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
+		density_pBuffer[1] = (vmath::vec2*)glMapNamedBufferRange(m_vbo[DENSITY_A + 1], 0, POINTS_TOTAL * sizeof(vmath::vec2), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
+
 		for (int i = 0; i < 2; i++)
 		{
 			fence[i] = 0;
 			glBindBuffer(GL_ARRAY_BUFFER, m_grdBufferChunks_vbo[i]);			
 			glBufferStorage(GL_ARRAY_BUFFER, GRIDLIST_SIZE, NULL, GL_DYNAMIC_STORAGE_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
 
-			int* gridBuffertmp = (int *)glMapNamedBufferRange(m_grdBufferChunks_vbo[i], 0, GRIDLIST_SIZE, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_FLUSH_EXPLICIT_BIT);
+			gridBuffer[i] = (int *)glMapNamedBufferRange(m_grdBufferChunks_vbo[i], 0, GRIDLIST_SIZE, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_FLUSH_EXPLICIT_BIT);
 
-			gridOptimiser->fillList(pointsBuffer[i % 2], gridBuffertmp, glass_pos);
-			gridBuffer[i] = gridBuffertmp;
-
+			gridOptimiser->fillList(pointsBuffer[i], gridBuffer[i], glass_pos);
 			(gridOptimiser)->join_Workers();
+									
+			((ArraysFromListsAllIndsPerCellThreadPoolOptimiser*)gridOptimiser)->SortAllData(pointsBuffer[i], velosityBuffer[i], density_pBuffer[i], gridBuffer[i]);
 			
 			glBindTexture(GL_TEXTURE_BUFFER, m_GRIDLIST_tbo[i]);
 			glTexBuffer(GL_TEXTURE_BUFFER, GL_R32I, m_grdBufferChunks_vbo[i]);
@@ -2169,6 +2176,11 @@ public:
 			#endif
 
 			glFlushMappedNamedBufferRange(m_grdBufferChunks_vbo[((m_iteration_index) & 1)], 0, GRIDLIST_SIZE);
+
+			/*glFlushMappedNamedBufferRange(m_vbo[POSITION_A + ((m_iteration_index) & 1)], 0, POSITIONS_SIZE);
+			glFlushMappedNamedBufferRange(m_vbo[VELOCITY_A + ((m_iteration_index) & 1)], 0, POINTS_TOTAL * sizeof(vmath::vec4));
+			glFlushMappedNamedBufferRange(m_vbo[DENSITY_A + ((m_iteration_index) & 1)], 0, POINTS_TOTAL * sizeof(vmath::vec2));*/
+			
 			gridOptimiser->fillList(pointsBuffer[(m_iteration_index) & 1], gridBuffer[(m_iteration_index + 1) & 1], glass_pos);
 
 
