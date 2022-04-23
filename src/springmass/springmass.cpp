@@ -61,7 +61,7 @@ enum
 	CONNECTIONS_TOTAL = (POINTS_X - 1) * POINTS_Y + (POINTS_Y - 1) * POINTS_X
 };
 
-#define INT_STATE_FROM_FILE 1
+#define INT_STATE_FROM_FILE 0
 #define OPTIM_STRUCT  6 //0=no 1=array 2=lists 3=listsParral 4=listsParralThreadPool 5=listsParralThreadPoolArrays 6=arrayAllNeighbourIndsInCell 7=arrayAllNeighbourDataInCell
 
 const int GRID_SIDE =  15;
@@ -1436,16 +1436,16 @@ public:
 					float fi = (float)i / (float)POINTS_X;
 
 					initial_positions[n] = vmath::vec3(
-						(fi - 0.5f) * (float)POINTS_X * 0.5,
-						(fj - 0.5f) * (float)POINTS_Y * 0.5,
-						(fk - 0.5f) * (float)POINTS_Z * 0.5);
+						(fi - 0.5f) * (float)POINTS_X * 1.2,
+						(fj - 2.0f) * (float)POINTS_Y * 0.3,
+						(fk - 0.5f) * (float)POINTS_Z * 1.2);
 
 
 					//initial_velocities[n] = vmath::vec4(vel[0],vel[1],vel[2],1/25.0)*25;
 					const float mas = i < 7.5 ? 1 : 1;
 					initial_velocities[n] = i & 2 ? vmath::vec4(0, 0, 0, mas) : vmath::vec4(0, 0, 0, mas);
 					initial_colors[n] = i < 7.5 ? vmath::Tvec4<char>(255, 0, 0, 255) : vmath::Tvec4<char>(0, 0, 255, 255);
-					initial_density_pressure[n] = vmath::vec2(1, 1);
+					initial_density_pressure[n] = vmath::vec2(1, 20);
 					n++;
 				}
 			}
