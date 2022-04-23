@@ -1857,6 +1857,24 @@ public:
 			sprintf(buffer, "Stalling!!!");
 			overlay.drawText(buffer, 0, 4);
 		}
+
+		
+		sprintf(buffer, "FillDensityTexture: %3.2fms", fillDensityFieldTextureTime);
+		DBOUT(buffer << '\n')
+		overlay.drawText(buffer, 0, 5);
+
+		sprintf(buffer, "RayTracingTime: %3.2fms", rayTracingTime);
+		DBOUT(buffer << '\n')
+		overlay.drawText(buffer, 0, 6);
+
+		
+		GLuint totalRayTracingTime;
+		glGetQueryObjectuiv(timerQueries[1], GL_QUERY_RESULT, &totalRayTracingTime);
+		totalRayTracingTime = totalRayTracingTime / 1000000.0;
+		sprintf(buffer, "TotalRayTracingTime: %3.2fms", totalRayTracingTime);
+		DBOUT(buffer << '\n')
+		overlay.drawText(buffer, 0, 7);
+
 		DBOUT("\n\n")
 		overlay.draw();
 	}
@@ -2151,8 +2169,14 @@ public:
 		}
 		if (draw_raytrace)
 		{
+			glBeginQuery(GL_TIME_ELAPSED, timerQueries[1]);
 			//m_iteration_index--;
+			std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 			fillDensityFieldTexture();
+			std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+			fillDensityFieldTextureTime = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count() / 1000.0;//OptimJoin
+
+
 			glDisable(GL_DEPTH_TEST);
 			/*glEnable(GL_STENCIL_TEST);
 
@@ -2199,6 +2223,11 @@ public:
 			glEnable(GL_DEPTH_TEST);
 			glStencilMask(0xFF);
 			glDisable(GL_STENCIL_TEST);
+
+			glEndQuery(GL_TIME_ELAPSED);
+
+			std::chrono::high_resolution_clock::time_point t3 = std::chrono::high_resolution_clock::now();
+			rayTracingTime = std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2).count() / 1000.0;
 		}
 
 
@@ -2727,6 +2756,8 @@ private:
 
 	float fps;
 	float optTime;
+	float fillDensityFieldTextureTime;
+	float rayTracingTime;
 	float updateTime;
 	float lastTime;
 	int frames;
