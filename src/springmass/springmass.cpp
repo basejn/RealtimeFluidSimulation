@@ -68,7 +68,7 @@ const int GRID_SIDE =  15;
 const float GRID_VOLUME_SIDE = 20.0f; //+-10
 const float GRID_OFFSET = 10.0f; //+-10
 const float CELL_SIZE = GRID_VOLUME_SIDE / GRID_SIDE;
-const int DENSITY_TEX_SIDE = 64.0;// trqbva da se promeni i v GeometryShadera
+const int DENSITY_TEX_SIDE = 64;// trqbva da se promeni i v GeometryShadera
 const int CELL_COUNT = GRID_SIDE * GRID_SIDE * GRID_SIDE;
 #if (OPTIM_STRUCT ==1||OPTIM_STRUCT ==5)
 const int GRIDLIST_SIZE = (GRID_SIDE * GRID_SIDE * GRID_SIDE * 3 + POINTS_TOTAL) * sizeof(int);
@@ -1346,7 +1346,7 @@ public:
 		rayTraceCube_buffer(0),
 		balls_buffer(0),
 		draw_points(true),
-		draw_raytrace(false),
+		draw_raytrace(true),
 		draw_skybox(true),
 		iterations_per_frame(1)
 	{
@@ -1422,26 +1422,23 @@ public:
 
 		vmath::vec2* initial_density_pressure = new vmath::vec2[POINTS_TOTAL];
 		vmath::vec2* tex_coords = new vmath::vec2[POINTS_TOTAL];
-		int n = 0;
-		vmath::vec4 vel = vmath::vec4(0.0, 1.0, 0.0, 1.0);
+		int n = 0;		
 		for (k = 0; k < POINTS_Z; k++)
 		{
-			float fk = (float)k / (float)POINTS_Z;
-			vel = vel * vmath::rotate(360 / (float)POINTS_Z, 0.0f, 0.0f, 1.0f);
+			float fk = (float)k / (float)POINTS_Z;			
 			for (j = 0; j < POINTS_Y; j++)
 			{
+				float XZOffset = j % 2 ? 0.3 : -0.3;
 				float fj = (float)j / (float)POINTS_Y;
 				for (i = 0; i < POINTS_X; i++)
 				{
 					float fi = (float)i / (float)POINTS_X;
 
 					initial_positions[n] = vmath::vec3(
-						(fi - 0.5f) * (float)POINTS_X * 1.2,
+						(fi - 0.5f) * (float)POINTS_X * 1.1 + XZOffset,
 						(fj - 2.0f) * (float)POINTS_Y * 0.3,
-						(fk - 0.5f) * (float)POINTS_Z * 1.2);
-
-
-					//initial_velocities[n] = vmath::vec4(vel[0],vel[1],vel[2],1/25.0)*25;
+						(fk - 0.5f) * (float)POINTS_Z * 1.1 + XZOffset);
+										
 					const float mas = i < 7.5 ? 1 : 1;
 					initial_velocities[n] = i & 2 ? vmath::vec4(0, 0, 0, mas) : vmath::vec4(0, 0, 0, mas);
 					initial_colors[n] = i < 7.5 ? vmath::Tvec4<char>(255, 0, 0, 255) : vmath::Tvec4<char>(0, 0, 255, 255);
@@ -1969,14 +1966,13 @@ public:
 		static const GLuint draw_buffers[] = { GL_COLOR_ATTACHMENT0 };
 		glDrawBuffers(1, draw_buffers);
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
 		glBindTexture(GL_TEXTURE_BUFFER, 0);
 		glBindTexture(GL_TEXTURE_3D, 0);
 		glBindVertexArray(0);
 	}
 
 	void fillDensityFieldTexture()
-	{
+	{		
 		glBindFramebuffer(GL_FRAMEBUFFER, density_Texture_FBO);
 		glViewport(0, 0, DENSITY_TEX_SIDE, DENSITY_TEX_SIDE);
 		glBindVertexArray(fill_density_Texture_VAO);
@@ -1990,8 +1986,9 @@ public:
 #if OPTIM_STRUCT==7
 		glActiveTexture(GL_TEXTURE3);
 		glBindTexture(GL_TEXTURE_BUFFER, m_GRID_DATA_tbo[m_iteration_index & 1]);
-#endif
-		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+#endif		
+		glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, DENSITY_TEX_SIDE);
+		
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glViewport(0, 0, info.windowWidth, info.windowHeight);
 	}

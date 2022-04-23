@@ -144,5 +144,5 @@ float preasureInPoint(vec3 point){
 	
 void main(void)
 {
-density=preasureInPoint(fs_in.coord);
+	density=preasureInPoint(fs_in.coord);
 }
