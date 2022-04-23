@@ -762,6 +762,81 @@ public:
 		}
 	}
 
+	void SortAllData(vmath::vec3* position, vmath::vec4* velocity, vmath::vec2* density, int* outGridBufferNew)
+	{
+		vmath::vec3* position_old = new vmath::vec3[POINTS_TOTAL];
+		vmath::vec4* velocity_old = new vmath::vec4[POINTS_TOTAL];
+		vmath::vec2* density_old = new vmath::vec2[POINTS_TOTAL]; 
+		memcpy(position_old, position, POINTS_TOTAL * sizeof(vec3));
+		memcpy(velocity_old, velocity, POINTS_TOTAL * sizeof(vec4));
+		memcpy(density_old, density, POINTS_TOTAL * sizeof(vec2));
+
+		
+		gridBuffer; // List of Lists
+
+		// iter grids one by one. 
+		// iter each grid indices (linked list of indices for each grid)
+		// in that order copy each particle data from the above 3 arrays.
+		// fill the outGridBufferNew using the new indices (indexRemap).
+
+		int indexRemap[POINTS_TOTAL];
+		int newParticleDataInd = -1;
+		for (int curInd = 0; curInd < gridSize; curInd++)
+		{
+			int curentIteratingIndex = gridBuffer[curInd * 2];
+			while (curentIteratingIndex != 0)
+			{
+				int oldParticleDataInd = gridBuffer[curentIteratingIndex];
+				curentIteratingIndex = gridBuffer[curentIteratingIndex + 1];// pointer to next 
+								
+				indexRemap[oldParticleDataInd] = ++newParticleDataInd;
+				
+				//copy data to new places
+
+				position[newParticleDataInd] = position_old[oldParticleDataInd];
+				velocity[newParticleDataInd] = velocity_old[oldParticleDataInd];
+				density[newParticleDataInd] = density_old[oldParticleDataInd];
+			}
+		}
+
+
+		int lastUsedIndex = gridSize * 2;
+		for (int curInd = 0; curInd < gridSize; curInd++)
+		{
+			//calculate new array size : sum of all neighbouring cells sizes
+			auto neighbours = &neighbourIndCache[curInd];// genNeighbourInds(curInd);			
+			
+
+			int curCelSize = 0;
+			for (auto neighbourCellInd : *neighbours)
+			{
+				curCelSize += gridBuffer[neighbourCellInd * 2 + 1];
+			}						
+
+			//prepare new array
+			int curentParticlePosIndex = lastUsedIndex; //new array position
+			lastUsedIndex += curCelSize + 1;			//update new free memory position
+
+			outGridBufferNew[curentParticlePosIndex + curCelSize + 1] = 0;// null terminate last position of new array
+			outGridBufferNew[curInd * 2] = curentParticlePosIndex;//new array position
+			outGridBufferNew[curInd * 2 + 1] = curCelSize;//size of new array
+
+			//fill indices from neighbours
+			for (auto neighbourCellInd : *neighbours)
+			{
+				int curentIteratingIndex = gridBuffer[neighbourCellInd * 2];
+				while (curentIteratingIndex != 0)
+				{
+					int particleDataInd = gridBuffer[curentIteratingIndex];
+					outGridBufferNew[curentParticlePosIndex++] = indexRemap[particleDataInd];
+					curentIteratingIndex = gridBuffer[curentIteratingIndex + 1];
+				}
+			}
+		
+		}
+
+	}
+
 private:
 	void printList(std::string fileName, int* gridBuffer)
 	{
