@@ -18,10 +18,10 @@
 #include <thread>
 #include<string>
 #include<fstream>
-#include<string>
 #include <mutex>
 #include<vector>
 #include<memory>
+#include "Chron.h"
 
 #define DBOUT( s )            \
 {                              \
@@ -1628,8 +1628,14 @@ public:
 
 			gridOptimiser->fillList(pointsBuffer[i], gridBuffer[i], glass_pos);
 			(gridOptimiser)->join_Workers();
-									
-			((ArraysFromListsAllIndsPerCellThreadPoolOptimiser*)gridOptimiser)->SortAllData(pointsBuffer[i], velosityBuffer[i], density_pBuffer[i], gridBuffer[i]);
+			
+			
+			{auto a = Chron([](auto t) {DBOUT("SortAllData() time: " << t << "ms \n"); });
+				((ArraysFromListsAllIndsPerCellThreadPoolOptimiser*)gridOptimiser)->SortAllData(pointsBuffer[i], velosityBuffer[i], density_pBuffer[i], gridBuffer[i]);
+			}
+			
+
+						
 			
 			glBindTexture(GL_TEXTURE_BUFFER, m_GRIDLIST_tbo[i]);
 			glTexBuffer(GL_TEXTURE_BUFFER, GL_R32I, m_grdBufferChunks_vbo[i]);

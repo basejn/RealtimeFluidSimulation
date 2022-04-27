@@ -571,6 +571,7 @@
     </ProjectReference>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\springmass\Chron.cpp" />
     <ClCompile Include="src\springmass\springmass.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -601,6 +602,9 @@
     <None Include="bin\media\shaders\update.vs.neibours cells array set.glsl" />
     <None Include="bin\media\shaders\update.vs.neibours ofsetArray.glsl" />
     <None Include="bin\media\shaders\update.vs.working water h5.glsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\springmass\Chron.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

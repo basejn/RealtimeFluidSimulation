@@ -12,6 +12,9 @@
     <ClCompile Include="src\springmass\springmass.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\springmass\Chron.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="bin\media\shaders\fill.density.field.fs.glsl">
@@ -95,5 +98,10 @@
     <None Include="bin\media\shaders\update.vs.working water h5.glsl">
       <Filter>Shaders</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\springmass\Chron.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
