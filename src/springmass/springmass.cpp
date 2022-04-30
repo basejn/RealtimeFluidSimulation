@@ -2139,14 +2139,18 @@ public:
 		glUniform3fv(atractC_loc, 1, atractC);
 		glUniform3fv(repulsC_loc, 1, repulsC);
 
+		int curBufInd = 0;
+		int nextBufInd = 0;
+
 		for (int i = iterations_per_frame; i != 0; --i)
 
 		{
 			m_iteration_index++;
-
+			curBufInd = (m_iteration_index) & 1;
+			nextBufInd = (m_iteration_index + 1) & 1;
 			if (requestRain > 0)
 			{
-				rain((m_iteration_index)& 1);
+				rain(curBufInd);
 				requestRain--;
 			}
 
@@ -2155,33 +2159,32 @@ public:
 			sphere1_CurentInterpol = tmp_sphere1_CurentInterpol;
 			glUniform4fv(sphere1_loc, 1, sphere1_CurentInterpol);
 			glUniform3fv(sphere1_speed_loc, 1, tmp_sphere1_speed);
-			glBindVertexArray(m_vao[m_iteration_index & 1]);
+			glBindVertexArray(m_vao[curBufInd]);
 
 			std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 
 #if(OPTIM_STRUCT==4||OPTIM_STRUCT==5||OPTIM_STRUCT==6 || OPTIM_STRUCT==7)
 			glFinish();		
-
-			//m_iteration_index+=CHUNK_COUNT/2 ;//5;
-			//std::this_thread::sleep_for(std::chrono::milliseconds(10));
-			if (fence[(m_iteration_index)& 1] != 0)
+						
+			if (fence[curBufInd] != 0)
 			{
-				glGetSynciv(fence[(m_iteration_index)& 1], GL_SYNC_STATUS, sizeof(int), nullptr, &isSignaled);
+				glGetSynciv(fence[curBufInd], GL_SYNC_STATUS, sizeof(int), nullptr, &isSignaled);
 				stalling = isSignaled == GL_UNSIGNALED;
-				glClientWaitSync(fence[(m_iteration_index)& 1], 0, GL_TIMEOUT_IGNORED);
-				glGetSynciv(fence[(m_iteration_index)& 1], GL_SYNC_STATUS, sizeof(int), nullptr, &isSignaled);
-				glDeleteSync(fence[(m_iteration_index)& 1]);
+				glClientWaitSync(fence[curBufInd], 0, GL_TIMEOUT_IGNORED);
+				glGetSynciv(fence[curBufInd], GL_SYNC_STATUS, sizeof(int), nullptr, &isSignaled);
+				glDeleteSync(fence[curBufInd]);
 			}
 			
 			gridOptimiser->join_Workers();
 			
 			#if OPTIM_STRUCT == 7
 			
-			((ArraysFromListsAllDataPerCellThreadPoolOptimiser*)gridOptimiser)->gridArraysAllIndsPerCellFromListKernel(pointsBuffer[(m_iteration_index) & 1], velosityBuffer[(m_iteration_index) & 1], density_pBuffer[(m_iteration_index) & 1], gridBuffer[(m_iteration_index) & 1], gridDataBuffer[(m_iteration_index) & 1]);			
-			glFlushMappedNamedBufferRange(m_GridDataBufferChunks_vbo[((m_iteration_index)& 1)], 0, GRIDLIST_DATA_SIZE); 
+			((ArraysFromListsAllDataPerCellThreadPoolOptimiser*)gridOptimiser)->gridArraysAllIndsPerCellFromListKernel(pointsBuffer[curBufInd], velosityBuffer[curBufInd], density_pBuffer[curBufInd], gridBuffer[curBufInd], gridDataBuffer[curBufInd]);
+			glFlushMappedNamedBufferRange(m_GridDataBufferChunks_vbo[curBufInd], 0, GRIDLIST_DATA_SIZE);
 			#endif
+					
 
-			glFlushMappedNamedBufferRange(m_grdBufferChunks_vbo[((m_iteration_index) & 1)], 0, GRIDLIST_SIZE);
+			glFlushMappedNamedBufferRange(m_grdBufferChunks_vbo[curBufInd], 0, GRIDLIST_SIZE);
 
 			/*glFlushMappedNamedBufferRange(m_vbo[POSITION_A + ((m_iteration_index) & 1)], 0, POSITIONS_SIZE);
 			glFlushMappedNamedBufferRange(m_vbo[VELOCITY_A + ((m_iteration_index) & 1)], 0, POINTS_TOTAL * sizeof(vmath::vec4));
@@ -2191,37 +2194,36 @@ public:
 
 
 #elif(OPTIM_STRUCT >0)
-			int * gridBuffer = (int *)glMapNamedBufferRange(m_vbo[GRIDLIST_A + (m_iteration_index & 1)], 0, GRIDLIST_SIZE, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
-			vmath::vec3 * pointsBuffer = (vmath::vec3 *)glMapNamedBufferRange( m_vbo[POSITION_A + (m_iteration_index & 1)], 0, POSITIONS_SIZE, GL_MAP_READ_BIT);		
+			int * gridBuffer = (int *)glMapNamedBufferRange(m_vbo[GRIDLIST_A + curBufInd], 0, GRIDLIST_SIZE, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT);
+			vmath::vec3 * pointsBuffer = (vmath::vec3 *)glMapNamedBufferRange( m_vbo[POSITION_A + curBufInd], 0, POSITIONS_SIZE, GL_MAP_READ_BIT);
 			gridOptimiser->fillList(pointsBuffer,gridBuffer,glass_pos);
 			//gridOptimiser->printList(pointsBuffer,gridBuffer);std::exit(0); 		
-			glUnmapNamedBuffer(m_vbo[GRIDLIST_A + (m_iteration_index & 1)]);
-			glUnmapNamedBuffer(m_vbo[POSITION_A + (m_iteration_index & 1)]);
+			glUnmapNamedBuffer(m_vbo[GRIDLIST_A + curBufInd]);
+			glUnmapNamedBuffer(m_vbo[POSITION_A + curBufInd]);
 #endif
 			std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
 			optTime = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count() / 1000.0;//OptimJoin
 
 			#if OPTIM_STRUCT != 7
 			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_BUFFER, m_pos_tbo[m_iteration_index & 1]);
+			glBindTexture(GL_TEXTURE_BUFFER, m_pos_tbo[curBufInd]);
 			glActiveTexture(GL_TEXTURE1);
-			glBindTexture(GL_TEXTURE_BUFFER, m_vel_tbo[m_iteration_index & 1]);			
+			glBindTexture(GL_TEXTURE_BUFFER, m_vel_tbo[curBufInd]);
 			glActiveTexture(GL_TEXTURE3);
-			glBindTexture(GL_TEXTURE_BUFFER, m_density_tbo[m_iteration_index & 1]);
+			glBindTexture(GL_TEXTURE_BUFFER, m_density_tbo[curBufInd]);
 			#endif
 			
 			glActiveTexture(GL_TEXTURE2);
-			glBindTexture(GL_TEXTURE_BUFFER, m_GRIDLIST_tbo[m_iteration_index & 1]);
+			glBindTexture(GL_TEXTURE_BUFFER, m_GRIDLIST_tbo[curBufInd]);
 			
 #if OPTIM_STRUCT == 7
 			glActiveTexture(GL_TEXTURE4);
-			glBindTexture(GL_TEXTURE_BUFFER, m_GRID_DATA_tbo[m_iteration_index & 1]);
+			glBindTexture(GL_TEXTURE_BUFFER, m_GRID_DATA_tbo[curBufInd]);
 #endif
-			//
-			//m_iteration_index++;//the only increment
-			glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, m_vbo[POSITION_A + ((m_iteration_index + 1) & 1)]);
-			glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 1, m_vbo[VELOCITY_A + ((m_iteration_index + 1) & 1)]);
-			glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 2, m_vbo[DENSITY_A + ((m_iteration_index + 1) & 1)]);
+						
+			glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, m_vbo[POSITION_A + nextBufInd]);
+			glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 1, m_vbo[VELOCITY_A + nextBufInd]);
+			glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 2, m_vbo[DENSITY_A + nextBufInd]);
 			glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 3, m_vbo[COLORS]);
 
 			glBeginQuery(GL_TIME_ELAPSED, timerQueries[0]);
@@ -2229,7 +2231,7 @@ public:
 			glDrawArrays(GL_POINTS, 0, POINTS_TOTAL);
 			glEndTransformFeedback();
 			glEndQuery(GL_TIME_ELAPSED);
-			fence[(m_iteration_index + 1) & 1] = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+			fence[nextBufInd] = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
 		}
 
 		glDisable(GL_RASTERIZER_DISCARD);
@@ -2251,19 +2253,18 @@ public:
 
 			glBindVertexArray(render_balls_vao);
 			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_BUFFER, m_pos_tbo[(m_iteration_index)& 1]);
+			glBindTexture(GL_TEXTURE_BUFFER, m_pos_tbo[curBufInd]);
 			glActiveTexture(GL_TEXTURE1);
-			glBindTexture(GL_TEXTURE_BUFFER, m_GRIDLIST_tbo[(m_iteration_index)& 1]);
+			glBindTexture(GL_TEXTURE_BUFFER, m_GRIDLIST_tbo[curBufInd]);
 			glActiveTexture(GL_TEXTURE2);
 			glBindTexture(GL_TEXTURE_BUFFER, m_color_tbo);
 			glActiveTexture(GL_TEXTURE3);
-			glBindTexture(GL_TEXTURE_BUFFER, m_density_tbo[(m_iteration_index)& 1]);
+			glBindTexture(GL_TEXTURE_BUFFER, m_density_tbo[curBufInd]);
 			glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, VERT_PER_BALL / 3, POINTS_TOTAL);
 		}
 		if (draw_raytrace)
 		{
-			glBeginQuery(GL_TIME_ELAPSED, timerQueries[1]);
-			//m_iteration_index--;
+			glBeginQuery(GL_TIME_ELAPSED, timerQueries[1]);			
 			std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 			fillDensityFieldTexture();
 			std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
@@ -2298,27 +2299,25 @@ public:
 			glBindVertexArray(render_fluid_ray_trace_vao);
 
 			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_BUFFER, m_pos_tbo[m_iteration_index & 1]);
+			glBindTexture(GL_TEXTURE_BUFFER, m_pos_tbo[curBufInd]);
 			glActiveTexture(GL_TEXTURE1);
-			glBindTexture(GL_TEXTURE_BUFFER, m_vel_tbo[m_iteration_index & 1]);
+			glBindTexture(GL_TEXTURE_BUFFER, m_vel_tbo[curBufInd]);
 			glActiveTexture(GL_TEXTURE2);
-			glBindTexture(GL_TEXTURE_BUFFER, m_GRIDLIST_tbo[m_iteration_index & 1]);
+			glBindTexture(GL_TEXTURE_BUFFER, m_GRIDLIST_tbo[curBufInd]);
 			glActiveTexture(GL_TEXTURE3);
-			glBindTexture(GL_TEXTURE_BUFFER, m_density_tbo[m_iteration_index & 1]);
+			glBindTexture(GL_TEXTURE_BUFFER, m_density_tbo[curBufInd]);
 			glActiveTexture(GL_TEXTURE4);
 			glBindTexture(GL_TEXTURE_BUFFER, m_color_tbo);
 			glActiveTexture(GL_TEXTURE5);
 			glBindTexture(GL_TEXTURE_CUBE_MAP, envMapTex);
 			glActiveTexture(GL_TEXTURE6);
-			glBindTexture(GL_TEXTURE_3D, density_Field_Texture);
-			//m_iteration_index++;
+			glBindTexture(GL_TEXTURE_3D, density_Field_Texture);			
 			glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 			glEnable(GL_DEPTH_TEST);
 			glStencilMask(0xFF);
 			glDisable(GL_STENCIL_TEST);
 
 			glEndQuery(GL_TIME_ELAPSED);
-
 			std::chrono::high_resolution_clock::time_point t3 = std::chrono::high_resolution_clock::now();
 			rayTracingTime = std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2).count() / 1000.0;
 		}
