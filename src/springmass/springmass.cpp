@@ -1408,8 +1408,8 @@ public:
 	GridOptimiser* gridOptimiser=0;
 	sb7::text_overlay overlay;
 
-	springmass_app()
-		: m_iteration_index(0),
+	springmass_app():
+		m_iteration_index(0),
 		m_update_program(0),
 		m_render_program(0),
 		m_render_mask_program(0),
@@ -1943,6 +1943,7 @@ public:
 		if (stalling)
 		{
 			sprintf(buffer, "Stalling!!!");
+			DBOUT(buffer << '\n')
 			overlay.drawText(buffer, 0, 4);
 		}
 
@@ -2163,15 +2164,11 @@ public:
 
 			std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 
-#if(OPTIM_STRUCT==4||OPTIM_STRUCT==5||OPTIM_STRUCT==6 || OPTIM_STRUCT==7)
-			glFinish();		
-						
+#if(OPTIM_STRUCT==4||OPTIM_STRUCT==5||OPTIM_STRUCT==6 || OPTIM_STRUCT==7)			
+			
 			if (fence[curBufInd] != 0)
-			{
-				glGetSynciv(fence[curBufInd], GL_SYNC_STATUS, sizeof(int), nullptr, &isSignaled);
-				stalling = isSignaled == GL_UNSIGNALED;
-				glClientWaitSync(fence[curBufInd], 0, GL_TIMEOUT_IGNORED);
-				glGetSynciv(fence[curBufInd], GL_SYNC_STATUS, sizeof(int), nullptr, &isSignaled);
+			{				
+				stalling = glClientWaitSync(fence[curBufInd], 0, GL_TIMEOUT_IGNORED) != GL_ALREADY_SIGNALED;				
 				glDeleteSync(fence[curBufInd]);
 			}
 			
@@ -2232,6 +2229,7 @@ public:
 			glEndTransformFeedback();
 			glEndQuery(GL_TIME_ELAPSED);
 			fence[nextBufInd] = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+			glFlush();
 		}
 
 		glDisable(GL_RASTERIZER_DISCARD);
