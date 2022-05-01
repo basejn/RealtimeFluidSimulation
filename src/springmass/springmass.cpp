@@ -1634,9 +1634,6 @@ public:
 				((ArraysFromListsAllIndsPerCellThreadPoolOptimiser*)gridOptimiser)->SortAllData(pointsBuffer[i], velosityBuffer[i], density_pBuffer[i], gridBuffer[i]);
 			}
 			
-
-						
-			
 			glBindTexture(GL_TEXTURE_BUFFER, m_GRIDLIST_tbo[i]);
 			glTexBuffer(GL_TEXTURE_BUFFER, GL_R32I, m_grdBufferChunks_vbo[i]);
 
@@ -2162,7 +2159,7 @@ public:
 			glUniform3fv(sphere1_speed_loc, 1, tmp_sphere1_speed);
 			glBindVertexArray(m_vao[curBufInd]);
 
-			std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
+			
 
 #if(OPTIM_STRUCT==4||OPTIM_STRUCT==5||OPTIM_STRUCT==6 || OPTIM_STRUCT==7)			
 			
@@ -2172,8 +2169,10 @@ public:
 				glDeleteSync(fence[curBufInd]);
 			}
 			
+			std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 			gridOptimiser->join_Workers();
-			
+			std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+			optTime = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count() / 1000.0;//OptimJoin
 			#if OPTIM_STRUCT == 7
 			
 			((ArraysFromListsAllDataPerCellThreadPoolOptimiser*)gridOptimiser)->gridArraysAllIndsPerCellFromListKernel(pointsBuffer[curBufInd], velosityBuffer[curBufInd], density_pBuffer[curBufInd], gridBuffer[curBufInd], gridDataBuffer[curBufInd]);
@@ -2198,9 +2197,7 @@ public:
 			glUnmapNamedBuffer(m_vbo[GRIDLIST_A + curBufInd]);
 			glUnmapNamedBuffer(m_vbo[POSITION_A + curBufInd]);
 #endif
-			std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
-			optTime = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count() / 1000.0;//OptimJoin
-
+			
 			#if OPTIM_STRUCT != 7
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_BUFFER, m_pos_tbo[curBufInd]);
@@ -2262,9 +2259,11 @@ public:
 		}
 		if (draw_raytrace)
 		{
+			glFinish();
 			glBeginQuery(GL_TIME_ELAPSED, timerQueries[1]);			
 			std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 			fillDensityFieldTexture();
+			glFinish();
 			std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
 			fillDensityFieldTextureTime = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count() / 1000.0;//OptimJoin
 
@@ -2314,10 +2313,10 @@ public:
 			glEnable(GL_DEPTH_TEST);
 			glStencilMask(0xFF);
 			glDisable(GL_STENCIL_TEST);
-
+			glFinish();
 			glEndQuery(GL_TIME_ELAPSED);
 			std::chrono::high_resolution_clock::time_point t3 = std::chrono::high_resolution_clock::now();
-			rayTracingTime = std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2).count() / 1000.0;
+			rayTracingTime = std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2).count() / 1000.0;			
 		}
 
 
