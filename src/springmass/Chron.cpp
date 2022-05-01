@@ -1,14 +1,15 @@
 #include <chrono>
 #include<string>
+#include<functional>
 
+template<typename T = std::function<void(double)>>
 class Chron
 {
 public:
 	std::chrono::high_resolution_clock::time_point tStart;
-	void(*callback)(double);
-	Chron(void(*callback)(double)) {
-		tStart = std::chrono::high_resolution_clock::now();
-		this->callback = callback;
+	T callback;
+	Chron(T callback) : callback(std::move(callback))  {
+		tStart = std::chrono::high_resolution_clock::now();		
 	}
 
 	~Chron() {
@@ -18,3 +19,7 @@ public:
 	}
 
 };
+
+Chron(void(*)(double))->Chron<void(*)(double)>;
+Chron(std::function<void(double)>)->Chron<std::function<void(double)>>;
+
