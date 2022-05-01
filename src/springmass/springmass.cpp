@@ -1423,7 +1423,8 @@ public:
 		draw_points(true),
 		draw_raytrace(true),
 		draw_skybox(true),
-		iterations_per_frame(1)
+		iterations_per_frame(1),
+		trigerSortData(true)
 	{
 	}
 
@@ -1609,14 +1610,14 @@ public:
 #if(OPTIM_STRUCT ==4||OPTIM_STRUCT ==5||OPTIM_STRUCT ==6)
 		glGenBuffers(2, m_grdBufferChunks_vbo);
 		glGenTextures(2, m_GRIDLIST_tbo);
-		pointsBuffer[0] = (vmath::vec3 *)glMapNamedBufferRange(m_vbo[POSITION_A], 0, POSITIONS_SIZE, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
-		pointsBuffer[1] = (vmath::vec3 *)glMapNamedBufferRange(m_vbo[POSITION_A + 1], 0, POSITIONS_SIZE, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
+		pointsBuffer[0] = (vmath::vec3 *)glMapNamedBufferRange(m_vbo[POSITION_A], 0, POSITIONS_SIZE, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_FLUSH_EXPLICIT_BIT);
+		pointsBuffer[1] = (vmath::vec3 *)glMapNamedBufferRange(m_vbo[POSITION_A + 1], 0, POSITIONS_SIZE, GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_FLUSH_EXPLICIT_BIT);
 
-		velosityBuffer[0] = (vmath::vec4*)glMapNamedBufferRange(m_vbo[VELOCITY_A], 0, POINTS_TOTAL * sizeof(vmath::vec4), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
-		velosityBuffer[1] = (vmath::vec4*)glMapNamedBufferRange(m_vbo[VELOCITY_A + 1], 0, POINTS_TOTAL * sizeof(vmath::vec4), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
+		velosityBuffer[0] = (vmath::vec4*)glMapNamedBufferRange(m_vbo[VELOCITY_A], 0, POINTS_TOTAL * sizeof(vmath::vec4), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_FLUSH_EXPLICIT_BIT);
+		velosityBuffer[1] = (vmath::vec4*)glMapNamedBufferRange(m_vbo[VELOCITY_A + 1], 0, POINTS_TOTAL * sizeof(vmath::vec4), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_FLUSH_EXPLICIT_BIT);
 
-		density_pBuffer[0] = (vmath::vec2*)glMapNamedBufferRange(m_vbo[DENSITY_A], 0, POINTS_TOTAL * sizeof(vmath::vec2), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
-		density_pBuffer[1] = (vmath::vec2*)glMapNamedBufferRange(m_vbo[DENSITY_A + 1], 0, POINTS_TOTAL * sizeof(vmath::vec2), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT);
+		density_pBuffer[0] = (vmath::vec2*)glMapNamedBufferRange(m_vbo[DENSITY_A], 0, POINTS_TOTAL * sizeof(vmath::vec2), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_FLUSH_EXPLICIT_BIT);
+		density_pBuffer[1] = (vmath::vec2*)glMapNamedBufferRange(m_vbo[DENSITY_A + 1], 0, POINTS_TOTAL * sizeof(vmath::vec2), GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_FLUSH_EXPLICIT_BIT);
 
 		for (int i = 0; i < 2; i++)
 		{
@@ -2182,11 +2183,28 @@ public:
 
 			glFlushMappedNamedBufferRange(m_grdBufferChunks_vbo[curBufInd], 0, GRIDLIST_SIZE);
 
-			/*glFlushMappedNamedBufferRange(m_vbo[POSITION_A + ((m_iteration_index) & 1)], 0, POSITIONS_SIZE);
-			glFlushMappedNamedBufferRange(m_vbo[VELOCITY_A + ((m_iteration_index) & 1)], 0, POINTS_TOTAL * sizeof(vmath::vec4));
-			glFlushMappedNamedBufferRange(m_vbo[DENSITY_A + ((m_iteration_index) & 1)], 0, POINTS_TOTAL * sizeof(vmath::vec2));*/
-			
-			gridOptimiser->fillList(pointsBuffer[(m_iteration_index) & 1], gridBuffer[(m_iteration_index + 1) & 1], glass_pos);
+			if (trigerSortData and true) {
+				auto a = Chron([](auto t){ DBOUT("SortAllData and Flush buffers:"<<t<<"\n");});
+				
+				// Try ot call this method on each frame , or periodically . If periodically and if SortAllData is slow, it can be called periodically, each 10 frames , in the background and dinamically swapping the buffers in the end..
+				// Sort out all the buffer mappings. Remove unnecesary
+				// Time memory transfer and if not negligable , introduce third step in the convayor - memory transfer. Using 3 buffer sets instead of 2 . 
+				
+				// think about whole optimization of SortAllData and fillList internally. Use directly the "lists of lists" and dont generate gridBuffer twice
+				// think about convayerisation of SortAllData
+				((ArraysFromListsAllIndsPerCellThreadPoolOptimiser*)gridOptimiser)->SortAllData(pointsBuffer[curBufInd], velosityBuffer[curBufInd], density_pBuffer[curBufInd], gridBuffer[curBufInd]);
+
+				if (true) {
+					auto b = Chron([](auto t) { DBOUT("Flush buffers:" << t << "\n"); });
+					glFlushMappedNamedBufferRange(m_vbo[POSITION_A + curBufInd], 0, POSITIONS_SIZE);
+					glFlushMappedNamedBufferRange(m_vbo[VELOCITY_A + curBufInd], 0, POINTS_TOTAL * sizeof(vmath::vec4));
+					glFlushMappedNamedBufferRange(m_vbo[DENSITY_A + curBufInd], 0, POINTS_TOTAL * sizeof(vmath::vec2));
+				}
+				trigerSortData = false;				
+			}
+
+			gridOptimiser->fillList(pointsBuffer[curBufInd], gridBuffer[nextBufInd], glass_pos);
+						
 
 
 #elif(OPTIM_STRUCT >0)
@@ -2450,6 +2468,8 @@ private:
 			case 'L': draw_raytrace = !draw_raytrace;
 				break;
 			case 'P': draw_points = !draw_points;
+				break;
+			case 'Y': trigerSortData = true;
 				break;
 			case 'T': draw_triangles = !draw_triangles;
 				break;
@@ -2817,6 +2837,8 @@ private:
 	GLsync fence[2];
 	GLint isSignaled;
 	bool stalling;
+
+	bool trigerSortData;
 
 	GLuint envMapTex;
 
